@@ -304,3 +304,42 @@ def test_printable_qr_card():
     assert "http://192.168.4.1" in content
     assert "Print Setup Card" in content
     assert "SisterClock ✨ Quick Start" in content
+
+
+def test_captive_portal_and_ap_mode_robustness():
+    with open(INO_FILE, "r", encoding="utf-8") as f:
+        ino = f.read()
+
+    # /index.html must be explicitly registered alongside /
+    assert 'server.on("/index.html", HTTP_GET, sendIndexHtml);' in ino
+
+    # /scan must switch to WIFI_AP_STA if in WIFI_AP mode
+    assert 'WiFi.mode(WIFI_AP_STA);' in ino
+
+    # handleCaptivePortal must send immediate 404 for missing static assets to prevent socket hangs
+    assert 'uri.endsWith(".png")' in ino
+    assert 'request->send(404, "text/plain", "Not found");' in ino
+
+    # AP loop helper banner must be reachable in isAPMode block
+    assert 'CONNECT PHONE TO: SisterClock-Setup' in ino
+    assert 'P.displayScroll' in ino
+
+def test_index_html_js_syntax_integrity():
+    with open(HTML_FILE, "r", encoding="utf-8") as f:
+        html = f.read()
+
+    # Verify no unmatched braces in the main script block
+    import re
+    scripts = re.findall(r'<script\b[^>]*>(.*?)</script>', html, re.DOTALL)
+    assert len(scripts) >= 1, "Must contain at least one script block"
+
+    main_script = scripts[0]
+    # Simple brace balance check
+    # Filter out braces inside strings and regexes
+    clean_js = re.sub(r'([\'"`])(?:\\.|(?!\1).)*\1', '', main_script)
+    clean_js = re.sub(r'//.*', '', clean_js)
+    clean_js = re.sub(r'/\*.*?\*/', '', clean_js, flags=re.DOTALL)
+
+    open_braces = clean_js.count('{')
+    close_braces = clean_js.count('}')
+    assert open_braces == close_braces, f"Mismatched braces in JS: {open_braces} open vs {close_braces} close"

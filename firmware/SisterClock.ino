@@ -2176,16 +2176,17 @@ void setupWebServer() {
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-Source");
 
   // Root handler with BOTH CORS and Cache-Prevention
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
+  // Root & index.html handlers with BOTH CORS and Cache-Prevention
+  auto sendIndexHtml = [](AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html);
-    // Anti-Caching Headers: Ensures the browser always fetches the latest UI
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
-    // CORS Header (Manual insurance for strict browser scrutiny)
     response->addHeader("Access-Control-Allow-Origin", "*");
     request->send(response);
-  });
+  };
+  server.on("/", HTTP_GET, sendIndexHtml);
+  server.on("/index.html", HTTP_GET, sendIndexHtml);
 
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(204);
@@ -3022,6 +3023,7 @@ void setupWebServer() {
     // -2 means scan not triggered, -1 means scan in progress
     if (scanStatus < -1 || scanStatus == WIFI_SCAN_FAILED) {
       // Start the asynchronous scan
+      if (WiFi.getMode() == WIFI_AP) { WiFi.mode(WIFI_AP_STA); }
       WiFi.scanNetworks(true);
       request->send(202, "application/json", "{\"status\":\"processing\"}");
     } else if (scanStatus == -1) {
@@ -3599,31 +3601,18 @@ server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
 void handleCaptivePortal(AsyncWebServerRequest *request) {
   String uri = request->url();
 
-  // Never interfere with real UI or API
-  if (
-    uri == "/" || uri == "/index.html" || uri.startsWith("/config") || uri.startsWith("/hostname") || uri.startsWith("/ip") || uri.endsWith(".json") || uri.endsWith(".js") || uri.endsWith(".css") || uri.endsWith(".png") || uri.endsWith(".ico")) {
-    return;  // let normal handlers serve it
-  }
-
-  // Known captive portal probes → redirect
-  if (
-    uri == "/generate_204" || uri == "/gen_204" || uri == "/fwlink" || uri == "/hotspot-detect.html" || uri == "/ncsi.txt" || uri == "/cp/success.txt" || uri == "/library/test/success.html") {
-    if (isAPMode) {
-      IPAddress apIP = WiFi.softAPIP();
-      String redirectUrl = "http://" + apIP.toString() + "/";
-      AsyncWebServerResponse *response = request->beginResponse(302);
-      response->addHeader("Location", redirectUrl);
-      response->addHeader("Connection", "close");
-      request->send(response);
-      return;
-    }
-  }
-
-  // Unknown URLs in AP mode → redirect (helps odd OSes like /chat)
   if (isAPMode) {
     IPAddress apIP = WiFi.softAPIP();
     String redirectUrl = "http://" + apIP.toString() + "/";
-    Serial.printf(PSTR("[WEBSERVER] Captive fallback redirect: %s\n"), uri.c_str());
+
+    // Immediate 404 for non-existent static assets so client sockets close immediately
+    if (uri.endsWith(".png") || uri.endsWith(".jpg") || uri.endsWith(".ico") || uri.endsWith(".css") || uri.endsWith(".js") || uri.endsWith(".map")) {
+      request->send(404, "text/plain", "Not found");
+      return;
+    }
+
+    // All probes, unknown URLs, or /hotspot-detect.html in AP mode redirect to root setup page
+    Serial.printf(PSTR("[WEBSERVER] Captive redirect: %s -> %s\n"), uri.c_str(), redirectUrl.c_str());
     AsyncWebServerResponse *response = request->beginResponse(302);
     response->addHeader("Location", redirectUrl);
     response->addHeader("Connection", "close");
@@ -6550,38 +6539,80 @@ void loop() {
         delay(500);
         ESP.restart();
       }
-    }
-    // AP Mode animation
-    static unsigned long apAnimTimer = 0;
-    static int apAnimFrame = 0;
-    unsigned long now = millis();
-    if (now - apAnimTimer > 750) {
-      apAnimTimer = now;
-      apAnimFrame++;
-    }
-    P.setTextAlignment(PA_CENTER);
-    switch (apAnimFrame % 3) {
-      case 0:
-        {
-          char buf[] = { (char)0x8F, ' ', (char)169, '\0' };
-          P.print(buf);
-          break;
+      // Temporary AP fallback animation (when home router is offline)
+      static unsigned long apAnimTimer = 0;
+      static int apAnimFrame = 0;
+      unsigned long now = millis();
+      if (now - apAnimTimer > 750) {
+        apAnimTimer = now;
+        apAnimFrame++;
+      }
+      P.setTextAlignment(PA_CENTER);
+      switch (apAnimFrame % 3) {
+        case 0:
+          {
+            char buf[] = { (char)0x8F, ' ', (char)169, '\0' };
+            P.print(buf);
+            break;
+          }
+        case 1:
+          {
+            char buf[] = { (char)0x8F, ' ', (char)170, '\0' };
+            P.print(buf);
+            break;
+          }
+        case 2:
+          {
+            char buf[] = { (char)0x8F, ' ', (char)171, '\0' };
+            P.print(buf);
+            break;
+          }
+      }
+      yield();
+      return;
+    } else {
+      // AP SETUP MODE HELPER BANNER (First boot / Setup mode)
+      static bool apScrollInit = false;
+      static unsigned long apPauseStart = 0;
+      static bool apInPause = false;
+      static unsigned long lastHeartToggle = 0;
+      static bool heartToggle = false;
+      const unsigned long AP_PAUSE_MS = 2000;
+
+      if (!apScrollInit) {
+        P.displayReset();
+        P.setCharSpacing(1);
+        textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+        P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
+        apScrollInit = true;
+        apInPause = false;
+      }
+
+      if (apInPause) {
+        if (millis() - apPauseStart >= AP_PAUSE_MS) {
+          apInPause = false;
+          textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+          P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
+        } else {
+          if (millis() - lastHeartToggle > 400) {
+            lastHeartToggle = millis();
+            heartToggle = !heartToggle;
+            P.setTextAlignment(PA_CENTER);
+            P.print(heartToggle ? "\x8F SETUP \x8F" : "  SETUP  ");
+          }
         }
-      case 1:
-        {
-          char buf[] = { (char)0x8F, ' ', (char)170, '\0' };
-          P.print(buf);
-          break;
+      } else {
+        if (P.displayAnimate()) {
+          apInPause = true;
+          apPauseStart = millis();
+          P.displayClear();
+          P.setTextAlignment(PA_CENTER);
+          P.print("\x8F SETUP \x8F");
         }
-      case 2:
-        {
-          char buf[] = { (char)0x8F, ' ', (char)171, '\0' };
-          P.print(buf);
-          break;
-        }
+      }
+      yield();
+      return;
     }
-    yield();
-    return;
   }
 
   static bool colonVisible = true;
@@ -6723,51 +6754,6 @@ void loop() {
     return;  // Exit loop early if showing IP
   }
 
-
-  // --- AP SETUP MODE HELPER BANNER ---
-  if (isAPMode && !credentialsExist()) {
-    static bool apScrollInit = false;
-    static unsigned long apPauseStart = 0;
-    static bool apInPause = false;
-    static unsigned long lastHeartToggle = 0;
-    static bool heartToggle = false;
-    const unsigned long AP_PAUSE_MS = 2000;
-
-    if (!apScrollInit) {
-      P.displayReset();
-      P.setCharSpacing(1);
-      textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
-      P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
-      apScrollInit = true;
-      apInPause = false;
-    }
-
-    if (apInPause) {
-      if (millis() - apPauseStart >= AP_PAUSE_MS) {
-        apInPause = false;
-        textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
-        P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
-      } else {
-        if (millis() - lastHeartToggle > 400) {
-          lastHeartToggle = millis();
-          heartToggle = !heartToggle;
-          P.setTextAlignment(PA_CENTER);
-          P.print(heartToggle ? "\x8F SETUP \x8F" : "  SETUP  ");
-        }
-      }
-    } else {
-      if (P.displayAnimate()) {
-        apInPause = true;
-        apPauseStart = millis();
-        P.displayClear();
-        P.setTextAlignment(PA_CENTER);
-        P.print("\x8F SETUP \x8F");
-      }
-    }
-    dnsServer.processNextRequest();
-    yield();
-    return;
-  }
 
   // --- BRIGHTNESS/OFF CHECK ---
   if (brightness == -1) {

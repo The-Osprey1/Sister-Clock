@@ -4051,7 +4051,6 @@ const char index_html[] PROGMEM = R"rawliteral(
           showToast(show ? "✓ Date display enabled" : "✓ Date hidden", 2000);
         } catch (e) { console.error(e); showToast("Could not change date display. Check your connection and try again.", 5000); }
       }
-      }
 
       let _mobileBrightDebounce = null;
       function updateMobileBrightness(val) {
