@@ -77,10 +77,6 @@ if (-not $Python -or -not (Test-Path $Python)) {
 }
 & $Python -m esptool version
 if ($LASTEXITCODE -ne 0) { Write-Host "[ERROR] esptool is unavailable in $Python" -ForegroundColor Red; exit 1 }
-    exit 1
-}
-& $Python -m esptool version
-if ($LASTEXITCODE -ne 0) { Write-Host "[ERROR] esptool is unavailable in $Python" -ForegroundColor Red; exit 1 }
 
 # Optional flash erase
 if ($Erase) {
