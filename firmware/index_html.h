@@ -1709,9 +1709,9 @@ const char index_html[] PROGMEM = R"rawliteral(
 
         <div class="form-group no-ap" style="margin-top: 20px; padding: 16px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); border-radius: 14px;">
           <label class="toggle-row-lg donation-toggle-row" style="margin-bottom: 6px;">
-            <strong style="color: #fda4af; font-size: 1.1rem;">Sister Affirmations &amp; Cheerful Messages ❤️</strong>
+            <strong style="color: #fda4af; font-size: 1.1rem;">Daily Vibe Check &amp; Messages ✨</strong>
           </label>
-          <span class="small" style="color: #cbd5e1;">Uplifting love &amp; sweet reminders sent periodically to your sister's display ✨</span>
+          <span class="small" style="color: #cbd5e1;">Fun, subtle reminders &amp; vibe checks sent periodically to the display ✨</span>
           <br>
           <label class="toggle-row-lg donation-toggle-row" style="margin-top: 12px;">
             <span class="label-text">Enable Automated Affirmations:</span>
@@ -1721,11 +1721,11 @@ const char index_html[] PROGMEM = R"rawliteral(
             </span>
           </label>
           <p class="donation-note" style="margin-top: 6px; font-size: 0.85rem; color: #94a3b8;">
-            When enabled, SisterClock surprises her with heartwarming affirmations (e.g. "HAVE A WONDERFUL DAY, SIS! ❤️", "YOU MAKE THE WORLD BRIGHTER! ✨") during waking hours (9am - 9pm).
+            When enabled, SisterClock shows occasional fun messages and vibe checks (e.g. "VIBE CHECK: PASSED ✨", "STAY HYDRATED &amp; UNBOTHERED ✨") during daytime hours (9am - 9pm).
           </p>
           <div style="margin-top: 12px;">
             <button type="button" class="primary-button cmsg1" style="width: 100%; background: linear-gradient(135deg, #f43f5e, #ec4899); border: none; font-weight: 600;" onclick="sendAffirmationNow()">
-              Surprise Her Now! (Send Random Affirmation ❤️)
+              Send Vibe Check Now! ✨
             </button>
           </div>
         </div>
@@ -2471,7 +2471,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           target="_blank"
           rel="noopener noreferrer"
         >
-          SisterClock ✨ Handcrafted with Love
+          SisterClock ✨ Best Brother Edition
         </a>
       </div>
 

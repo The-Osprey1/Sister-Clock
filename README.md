@@ -77,7 +77,7 @@ pio run -t upload
 1. **Power on SisterClock:** On first boot, the display shows a pulsing heart `<3` indicating setup mode.
 2. **Connect to Hotspot:** On your smartphone or laptop, connect to the Wi-Fi network:
    - **SSID:** `SisterClock-Setup`
-   - **Password:** `sisterclock`
+   - **Password:** `bestbrother`
 3. **Open Portal:** Navigate to `http://192.168.4.1` (or `http://sisterclock.local`).
 4. **Configure Settings:**
    - Select your home Wi-Fi and enter the password.

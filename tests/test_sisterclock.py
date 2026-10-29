@@ -51,7 +51,7 @@ def test_sister_branding_and_identity():
 
     assert 'DEFAULT_HOSTNAME = "sisterclock"' in content, "Default hostname must be sisterclock"
     assert 'DEFAULT_AP_SSID = "SisterClock-Setup"' in content, "Default AP SSID must be SisterClock-Setup"
-    assert 'DEFAULT_AP_PASSWORD = "sisterclock"' in content, "Default AP password must be sisterclock"
+    assert 'DEFAULT_AP_PASSWORD = "bestbrother"' in content, "Default AP password must be bestbrother"
     assert '(char)0x8F' in content, "AP mode must show actual heart glyph (0x8F), not WIFI icon"
 
 def test_no_upstream_donation_nagware():
@@ -69,9 +69,9 @@ def test_sister_affirmations_present():
     with open(INO_FILE, "r", encoding="utf-8") as f:
         content = f.read()
 
-    assert "HAVE A WONDERFUL DAY, SIS!" in content
-    assert "LOVE YOU TO THE MOON & BACK!" in content
-    assert "BEST SISTER IN THE ENTIRE WORLD!" in content
+    assert "VIBE CHECK: PASSED" in content
+    assert "MAIN CHARACTER ENERGY" in content
+    assert "GIFTED BY THE BEST BROTHER" in content
     assert "SISTER_MESSAGE_COUNT = 10" in content
     assert "messageScrollTimes = 2" in content, "Sister affirmations should scroll twice"
 
@@ -137,9 +137,9 @@ def test_web_ui_customization():
         content = f.read()
 
     assert "<title>SisterClock ✨ Settings</title>" in content
-    assert "Sister Affirmations &amp; Cheerful Messages ❤️" in content
+    assert "Daily Vibe Check &amp; Messages ✨" in content
     assert "--accent-color: #f43f5e;" in content
-    assert "SisterClock ✨ Handcrafted with Love" in content
+    assert "SisterClock ✨ Best Brother Edition" in content
     assert "uploadOtaFile()" in content, "UI must support local .bin firmware uploading"
     assert "sendAffirmationNow()" in content, "UI must support instant surprise affirmation button"
     assert "insertToken(" in content, "UI must support quick token insertion buttons"

@@ -105,7 +105,7 @@ Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. The display will power on and show a pulsing heart <3." -ForegroundColor White
 Write-Host "  2. Connect your phone or laptop to WiFi network:" -ForegroundColor White
 Write-Host "       SSID:     SisterClock-Setup" -ForegroundColor Yellow
-Write-Host "       Password: sisterclock" -ForegroundColor Yellow
+Write-Host "       Password: bestbrother" -ForegroundColor Yellow
 Write-Host "  3. Open browser to: http://192.168.4.1 or http://sisterclock.local" -ForegroundColor White
 Write-Host "  4. Set up your home WiFi & surprise your sister! <3" -ForegroundColor White
 Write-Host ""

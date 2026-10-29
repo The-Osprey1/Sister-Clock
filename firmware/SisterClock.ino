@@ -207,7 +207,7 @@ int bridgeRotationCount = 0;
 
 // --- Device identity ---
 const char *DEFAULT_HOSTNAME = "sisterclock";
-const char *DEFAULT_AP_PASSWORD = "sisterclock";
+const char *DEFAULT_AP_PASSWORD = "bestbrother";
 const char *DEFAULT_AP_SSID = "SisterClock-Setup";
 String deviceHostname = DEFAULT_HOSTNAME;
 
@@ -6286,16 +6286,16 @@ String getFormattedDateText(const char *rawText) {
 // Sister Affirmation Engine & Message Scheduler
 // -----------------------------------------------------------------------------
 const char *const SISTER_MESSAGES[10] = {
-  "HAVE A WONDERFUL DAY, SIS! \x8F",
-  "YOU MAKE THE WORLD BRIGHTER! \xD1",
-  "REMEMBER TO DRINK WATER & SMILE :)",
-  "LOVE YOU TO THE MOON & BACK! \x8F",
-  "YOU ARE SMART, STRONG & KIND! \xD1",
-  "YOU\'VE GOT THIS TODAY! <3",
-  "SO PROUD OF YOU, SIS! \x8F",
-  "SHINE BRIGHT TODAY, SISTER! \xD1",
-  "BEST SISTER IN THE ENTIRE WORLD! \x8F",
-  "SENDING YOU BIG HUGS & LOVE! \xD2"
+  "VIBE CHECK: PASSED \xD1",
+  "MAIN CHARACTER ENERGY \xD2",
+  "STAY HYDRATED & UNBOTHERED \xD1",
+  "DON'T FORGET TO BE AWESOME \xD0",
+  "MAKE TODAY COUNT \xD1",
+  "PAUSE & TAKE A BREATHER \xD2",
+  "CERTIFIED COOL \xD1",
+  "LEVEL UP TODAY \xD0",
+  "GIFTED BY THE BEST BROTHER \xD0",
+  "LOOKING GOOD TODAY \xD1"
 };
 const int SISTER_MESSAGE_COUNT = 10;
 const char *const *DONATION_MESSAGES = SISTER_MESSAGES;
