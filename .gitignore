@@ -1,0 +1,12 @@
+# PlatformIO
+.pio/
+.vscode/
+
+# Python / Tests
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db

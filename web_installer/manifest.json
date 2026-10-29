@@ -1,0 +1,16 @@
+{
+  "name": "SisterClock",
+  "version": "1.0.0",
+  "home_assistant_domain": null,
+  "builds": [
+    {
+      "chipFamily": "ESP8266",
+      "parts": [
+        {
+          "path": "../dist/firmware.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}
