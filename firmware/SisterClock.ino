@@ -241,7 +241,7 @@ bool showDayOfWeek = true;
 bool showDate = false;
 bool showHumidity = false;
 bool colonBlinkEnabled = true;
-int clockStyle = 0;  // 0: Minimal Centered, 1: Day of Week + Time, 2: Time + Seconds
+int clockStyle = 1;  // 0: Minimal Centered, 1: Day of Week + Time, 2: Time + Seconds
 int alarmStyle = 0;  // 0: Invert Strobe, 1: Bell & Heart, 2: Wake-Up Banner
 char ntpServer1[64] = "pool.ntp.org";
 char ntpServer2[256] = "time.nist.gov";
@@ -290,6 +290,8 @@ const unsigned long uptimeLogInterval = 600000UL;  // 10 minutes in ms
 unsigned long totalUptimeSeconds = 0;              // Persistent accumulated uptime in seconds
 
 // Unified OTA Control Variables
+unsigned long otaLastActivity = 0;
+const unsigned long OTA_IDLE_TIMEOUT_MS = 30000;
 bool isUpdating = false;      // When true, all background tasks (Weather, NTP, Scroll) stop
 bool pendingRestart = false;  // Flag to trigger a safe reboot in the loop
 bool pendingConfigSave = false;
@@ -437,6 +439,7 @@ void previousDisplayMode(bool forced = false);
 void goToMode(const String &target);
 bool handlePomodoroCommand(String cmd);
 bool handleAlarmCommand(String cmd);
+void fireAlarm(int index, int brightnessOverride, int soundOverride);
 
 // --- Safe WiFi credential and API getters ---
 const char *getSafeSsid() {
@@ -479,8 +482,39 @@ textEffect_t getEffectiveScrollDirection(textEffect_t desiredDirection, bool isF
 // -----------------------------------------------------------------------------
 // Configuration Load & Save
 // -----------------------------------------------------------------------------
+// Write the new document completely before replacing the active configuration.
+// The backup is retained for recovery if power fails during replacement.
+bool writeConfigSafely(JsonDocument &doc) {
+  const char *temp = "/config.tmp";
+  File out = LittleFS.open(temp, "w");
+  if (!out) return false;
+  size_t expected = measureJson(doc);
+  size_t written = serializeJson(doc, out);
+  out.close();
+  if (!expected || written != expected) { LittleFS.remove(temp); return false; }
+  File verify = LittleFS.open(temp, "r");
+  JsonDocument check;
+  bool valid = verify && !deserializeJson(check, verify) && check.is<JsonObject>();
+  if (verify) verify.close();
+  if (!valid) { LittleFS.remove(temp); return false; }
+  if (LittleFS.exists("/config.json")) {
+    if (LittleFS.exists("/config.bak") && !LittleFS.remove("/config.bak")) { LittleFS.remove(temp); return false; }
+    if (!LittleFS.rename("/config.json", "/config.bak")) { LittleFS.remove(temp); return false; }
+  }
+  if (!LittleFS.rename(temp, "/config.json")) {
+    if (LittleFS.exists("/config.bak")) LittleFS.rename("/config.bak", "/config.json");
+    LittleFS.remove(temp);
+    return false;
+  }
+  return true;
+}
+
 void loadConfig() {
   Serial.println(F("[CONFIG] Loading configuration..."));
+
+  // Recover an interrupted replacement before creating defaults.
+  if (!LittleFS.exists("/config.json") && LittleFS.exists("/config.bak"))
+    LittleFS.rename("/config.bak", "/config.json");
 
   // Check if config.json exists, if not, create default
   if (!LittleFS.exists("/config.json")) {
@@ -505,7 +539,7 @@ void loadConfig() {
     doc[F("showDate")] = false;
     doc[F("showHumidity")] = showHumidity;
     doc[F("colonBlinkEnabled")] = colonBlinkEnabled;
-    doc[F("clockStyle")] = 0;
+    doc[F("clockStyle")] = 1;
     doc[F("alarmStyle")] = 0;
     doc[F("ntpServer1")] = ntpServer1;
     doc[F("ntpServer2")] = ntpServer2;
@@ -561,10 +595,19 @@ void loadConfig() {
   DeserializationError error = deserializeJson(doc, configFile);
   configFile.close();
 
-  if (error) {
-    Serial.print(F("[ERROR] JSON parse failed during load: "));
-    Serial.println(error.f_str());
-    return;
+  if (error || !doc.is<JsonObject>()) {
+    Serial.println(F("[CONFIG] Invalid configuration; trying backup."));
+    File backup = LittleFS.open("/config.bak", "r");
+    doc.clear();
+    DeserializationError backupError = backup ? deserializeJson(doc, backup) : DeserializationError::EmptyInput;
+    if (backup) backup.close();
+    if (backupError || !doc.is<JsonObject>()) {
+      Serial.println(F("[CONFIG] No valid backup found."));
+      return;
+    }
+    LittleFS.remove("/config.corrupt");
+    if (LittleFS.rename("/config.json", "/config.corrupt"))
+      LittleFS.rename("/config.bak", "/config.json");
   }
 
   bool configChanged = false;
@@ -2333,37 +2376,10 @@ void setupWebServer() {
       Serial.printf(PSTR("[SAVE] LittleFS total bytes: %u, used bytes: %u\n"), (unsigned)total, (unsigned)used);
 #endif
 
-    if (LittleFS.exists("/config.json")) {
-      Serial.println(F("[SAVE] Renaming /config.json to /config.bak"));
-      LittleFS.rename("/config.json", "/config.bak");
-    }
-    File f = LittleFS.open("/config.json", "w");
-    if (!f) {
-      Serial.println(F("[SAVE] ERROR: Failed to open /config.json for writing!"));
-      JsonDocument errorDoc;
-      errorDoc[F("error")] = "Failed to write config file.";
-      String response;
-      serializeJson(errorDoc, response);
-      request->send(500, "application/json", response);
+    if (!writeConfigSafely(doc)) {
+      request->send(500, "application/json", "{\"error\":\"Failed to save configuration\"}");
       return;
     }
-
-    size_t bytesWritten = serializeJson(doc, f);
-    Serial.printf(PSTR("[SAVE] Bytes written to /config.json: %u\n"), bytesWritten);
-    f.close();
-    Serial.println(F("[SAVE] /config.json file closed."));
-
-    if (bytesWritten == 0) {
-      Serial.println(F("[SAVE] ERROR: 0 bytes written to config.json!"));
-      JsonDocument errorDoc;
-      errorDoc[F("error")] = "Write failed: 0 bytes written.";
-      String response;
-      serializeJson(errorDoc, response);
-      request->send(500, "application/json", response);
-      return;
-    }
-
-    Serial.println(F("[SAVE] Config write verified (byte count check)."));
 
     JsonDocument okDoc;
     if (doc.containsKey("hostname")) {
@@ -2472,15 +2488,10 @@ void setupWebServer() {
   server.on("/set_clock_style", HTTP_POST, setHandler);
   server.on("/set_alarm_style", HTTP_POST, setHandler);
   server.on("/test_alarm", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (!alarmRinging) {
-      alarmRinging = true;
-      alarmStopAt = millis() + 10000;
-      alarmPreviousDisplayMode = displayMode;
-      displayMode = 0;
-    } else {
-      alarmRinging = false;
-      P.setInvert(false);
-    }
+    if (alarmRinging) { request->send(409, "text/plain", "Alarm already active"); return; }
+    if (!ntpSyncSuccessful) { request->send(409, "text/plain", "Time is not synchronized"); return; }
+    fireAlarm(0, -1, -1);
+    alarmStopAt = millis() + 10000;
     request->send(200, "application/json", "{\"ok\":true}");
   });
 
@@ -3404,7 +3415,7 @@ void setupWebServer() {
   });
 
   server.on("/perform_update", HTTP_GET, [](AsyncWebServerRequest *request) {
-    isUpdating = true;
+    // The upload handler starts update mode when data arrives.
 
     // Immediate UI Feedback
     P.displayClear();
@@ -3423,12 +3434,16 @@ void setupWebServer() {
         pendingRestart = true;
         restartTimer = millis();
       } else {
-        request->send(200, "text/plain", "FAIL");
+        isUpdating = false;
+        Update.end(false);
+        request->send(500, "text/plain", "FAIL");
       }
     },
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
       // This runs for every chunk of data received
+      otaLastActivity = millis();
       if (!index) {
+        isUpdating = true;
         Serial.printf(PSTR("[OTA] Start: %s\n"), filename.c_str());
 
 #ifdef ESP8266
@@ -3463,7 +3478,23 @@ void setupWebServer() {
       }
     });
 
-  server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
+    server.on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+    Serial.println(F("[WIFI] Reset Wi-Fi requested -> clearing credentials and entering setup mode"));
+    JsonDocument doc;
+    File f = LittleFS.open("/config.json", "r");
+    if (f) {
+      deserializeJson(doc, f);
+      f.close();
+    }
+    doc["ssid"] = "";
+    doc["password"] = "";
+    writeConfigSafely(doc);
+    request->send(200, "application/json", "{\"ok\":true,\"message\":\"Entering setup mode...\"}");
+    delay(400);
+    ESP.restart();
+  });
+
+server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
     // If not in AP mode, block and return a 403 response
     if (!isAPMode) {
       request->send(403, "text/plain", "Factory reset only allowed in AP mode.");
@@ -6166,21 +6197,7 @@ bool saveCountdownConfig(bool enabled, time_t targetTimestamp, const String &lab
   doc.remove("countdownTime");
   doc.remove("countdownLabel");
 
-  if (LittleFS.exists("/config.json")) {
-    LittleFS.rename("/config.json", "/config.bak");
-  }
-
-  File f = LittleFS.open("/config.json", "w");
-  if (!f) {
-    Serial.println(F("[COUNTDOWN] ERROR: Cannot write to /config.json"));
-    return false;
-  }
-
-  size_t bytesWritten = serializeJson(doc, f);
-  f.close();
-
-  Serial.printf(PSTR("[COUNTDOWN] Config updated. %u bytes written.\n"), bytesWritten);
-  return true;
+  return writeConfigSafely(doc);
 }
 
 bool saveConfigRuntime() {
@@ -6272,20 +6289,7 @@ bool saveConfigRuntime() {
     al["sound"] = alarmConfigs[i].sound;
   }
 
-  if (LittleFS.exists("/config.json")) {
-    LittleFS.rename("/config.json", "/config.bak");
-  }
-  File configFileWrite = LittleFS.open("/config.json", "w");
-  if (!configFileWrite) {
-    Serial.println(F("[CONFIG] Failed to open config for writing"));
-    return false;
-  }
-
-  serializeJson(doc, configFileWrite);
-  configFileWrite.close();
-
-  Serial.println(F("[CONFIG] Runtime config saved"));
-  return true;
+  return writeConfigSafely(doc);
 }
 
 //Custom font format for days and months
@@ -6351,12 +6355,14 @@ time_t calcNextAffirmationTime(bool isBoot) {
   struct tm local_tm;
   localtime_r(&now, &local_tm);
 
-  struct tm midnight = local_tm;
-  midnight.tm_hour = 0;
-  midnight.tm_min = 0;
-  midnight.tm_sec = 0;
-  midnight.tm_isdst = -1;
-  time_t todayMidnight = mktime(&midnight);
+  auto localTimeAtMinute = [&](int minute) -> time_t {
+    struct tm target = local_tm;
+    target.tm_hour = minute / 60;
+    target.tm_min = minute % 60;
+    target.tm_sec = 0;
+    target.tm_isdst = -1;
+    return mktime(&target);
+  };
 
   // Waking hours: 09:00 to 21:00 (540 to 1260 minutes from midnight)
   const int windowStart = 9 * 60;   // 09:00
@@ -6368,7 +6374,7 @@ time_t calcNextAffirmationTime(bool isBoot) {
     if (curMinOfDay >= windowStart && curMinOfDay < windowEnd - 20) {
       int nextMin = curMinOfDay + random(10, 25);
       Serial.printf(PSTR("[AFFIRMATION] First affirmation scheduled today at %02d:%02d\n"), nextMin / 60, nextMin % 60);
-      return todayMidnight + ((time_t)nextMin * 60L);
+      return localTimeAtMinute(nextMin);
     }
   }
 
@@ -6377,15 +6383,19 @@ time_t calcNextAffirmationTime(bool isBoot) {
     int nextMin = curMinOfDay + random(60, 120);
     if (nextMin < windowEnd) {
       Serial.printf(PSTR("[AFFIRMATION] Next scheduled today at %02d:%02d\n"), nextMin / 60, nextMin % 60);
-      return todayMidnight + ((time_t)nextMin * 60L);
+      return localTimeAtMinute(nextMin);
     }
   }
 
-  // Outside daytime: schedule for tomorrow morning between 09:30 and 10:30
-  time_t tomorrowMidnight = (curMinOfDay >= windowEnd) ? (todayMidnight + 86400L) : todayMidnight;
+  // Before the waking window use today; otherwise use the next local day.
   int chosen = random(9 * 60 + 30, 10 * 60 + 30);
-  Serial.printf(PSTR("[AFFIRMATION] Scheduled tomorrow morning at %02d:%02d\n"), chosen / 60, chosen % 60);
-  return tomorrowMidnight + ((time_t)chosen * 60L);
+  struct tm nextMorning = local_tm;
+  if (curMinOfDay >= windowStart) nextMorning.tm_mday++;
+  nextMorning.tm_hour = chosen / 60;
+  nextMorning.tm_min = chosen % 60;
+  nextMorning.tm_sec = 0;
+  nextMorning.tm_isdst = -1;
+  return mktime(&nextMorning);
 }
 
 time_t calcNextDonationTime(bool forceTomorrow) {
@@ -6393,6 +6403,7 @@ time_t calcNextDonationTime(bool forceTomorrow) {
 }
 
 void triggerSisterAffirmation() {
+  if (alarmRinging) return;
   if (!sisterAffirmations) return;
   if (isAPMode) return;
   if (!ntpSyncSuccessful) return;
@@ -6506,7 +6517,7 @@ void loop() {
     }
   }
 
-  if (timerActive && (displayMode != 7 && displayMode != 6)) {
+  if (!alarmRinging && timerActive && (displayMode != 7 && displayMode != 6)) {
     if (!(clockOnlyDuringDimming && dimActive)) {
       displayMode = 7;
       timerSubState = 0;
@@ -6521,8 +6532,11 @@ void loop() {
   }
   // 2. OTA LOCK: If updating, yield to WiFi and stop everything else
   if (isUpdating) {
-    yield();
-    return;
+    if (millis() - otaLastActivity >= OTA_IDLE_TIMEOUT_MS && !pendingRestart) {
+      Update.end(false);
+      isUpdating = false;
+      forceMessageRestart = true;
+    } else { yield(); return; }
   }
   if (isAPMode) {
     dnsServer.processNextRequest();
@@ -6709,6 +6723,51 @@ void loop() {
     return;  // Exit loop early if showing IP
   }
 
+
+  // --- AP SETUP MODE HELPER BANNER ---
+  if (isAPMode && !credentialsExist()) {
+    static bool apScrollInit = false;
+    static unsigned long apPauseStart = 0;
+    static bool apInPause = false;
+    static unsigned long lastHeartToggle = 0;
+    static bool heartToggle = false;
+    const unsigned long AP_PAUSE_MS = 2000;
+
+    if (!apScrollInit) {
+      P.displayReset();
+      P.setCharSpacing(1);
+      textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+      P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
+      apScrollInit = true;
+      apInPause = false;
+    }
+
+    if (apInPause) {
+      if (millis() - apPauseStart >= AP_PAUSE_MS) {
+        apInPause = false;
+        textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
+        P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
+      } else {
+        if (millis() - lastHeartToggle > 400) {
+          lastHeartToggle = millis();
+          heartToggle = !heartToggle;
+          P.setTextAlignment(PA_CENTER);
+          P.print(heartToggle ? "\x8F SETUP \x8F" : "  SETUP  ");
+        }
+      }
+    } else {
+      if (P.displayAnimate()) {
+        apInPause = true;
+        apPauseStart = millis();
+        P.displayClear();
+        P.setTextAlignment(PA_CENTER);
+        P.print("\x8F SETUP \x8F");
+      }
+    }
+    dnsServer.processNextRequest();
+    yield();
+    return;
+  }
 
   // --- BRIGHTNESS/OFF CHECK ---
   if (brightness == -1) {
@@ -8312,9 +8371,10 @@ void loop() {
 
   // ---- CONFIG AUTO SAVE ----
   if (configDirty && !alarmRinging && millis() - lastBrightnessChange > saveDelay) {
-    saveConfigRuntime();
-    configDirty = false;
-    Serial.println(F("[CONFIG] Auto-saved"));
+    if (saveConfigRuntime()) {
+      configDirty = false;
+      Serial.println(F("[CONFIG] Auto-saved"));
+    }
   }
 
   if (currentMillis - lastUptimeLog >= uptimeLogInterval) {

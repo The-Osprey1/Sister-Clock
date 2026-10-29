@@ -36,9 +36,9 @@ Connect the **MAX7219 4-in-1 Module** (FC-16) to the **ESP8266 D1 Mini**:
 |:---|:---:|:---:|:---:|:---|
 | **VCC** | **5V** | - | 🔴 Red | Connect to 5V (NOT 3.3V) |
 | **GND** | **G (GND)** | - | ⚫ Black | Ground |
-| **DIN** | **D8** | GPIO 15 | 🟡 Yellow | Hardware SPI MOSI |
+| **DIN** | **D8** | GPIO 15 | 🟡 Yellow | Software SPI data |
 | **CS** | **D7** | GPIO 13 | 🟢 Green | Chip Select |
-| **CLK** | **D5** | GPIO 14 | 🔵 Blue | Hardware SPI Clock |
+| **CLK** | **D5** | GPIO 14 | 🔵 Blue | Software SPI clock |
 
 *For complete wiring diagrams and optional buzzer hookup, see [WIRING.md](WIRING.md).*
 
@@ -47,7 +47,7 @@ Connect the **MAX7219 4-in-1 Module** (FC-16) to the **ESP8266 D1 Mini**:
 ## ⚡ Flashing Options (Choose Any)
 
 ### Option 1: Browser-Based Flashing (Fastest & Easiest)
-1. Open [`SisterClock/web_installer/index.html`](web_installer/index.html) in **Google Chrome** or **Microsoft Edge**.
+1. Serve `web_installer/` over HTTPS or localhost, then open the served page in **Google Chrome** or **Microsoft Edge**. A GitHub Pages deployment can host it; the installer also requires an internet connection to load ESP Web Tools.
 2. Plug the D1 Mini into your computer using a USB data cable.
 3. Click **"Connect & Flash SisterClock"**, select your COM port, and wait ~30 seconds!
 
@@ -144,4 +144,4 @@ SisterClock/
 ---
 
 ## ❤️ License
-Personal non-commercial use. Handcrafted with love for your sister.
+Source headers identify upstream ESPTimeCast as personal, non-commercial use and refer to `LICENSE.txt`, which is not present here. Confirm the upstream license and redistribution permission before sharing releases.

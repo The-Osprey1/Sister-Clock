@@ -11,11 +11,11 @@ Enclosure: **MakerWorld Model 3009244**
 |:-------------------|:--------------------|:------------|:-----------------------|:------------------|
 | **VCC**            | **5V**              | -           | 5V Power Supply        | 🔴 Red            |
 | **GND**            | **G (GND)**         | -           | Ground                 | ⚫ Black          |
-| **DIN** (Data In)  | **D8**              | **GPIO 15** | Hardware SPI MOSI      | 🟡 Yellow         |
-| **CS** (Chip Sel)  | **D7**              | **GPIO 13** | Hardware SPI CS        | 🟢 Green          |
-| **CLK** (Clock)    | **D5**              | **GPIO 14** | Hardware SPI SCK       | 🔵 Blue           |
+| **DIN** (Data In)  | **D8**              | **GPIO 15** | Software SPI data      | 🟡 Yellow         |
+| **CS** (Chip Sel)  | **D7**              | **GPIO 13** | Software SPI select        | 🟢 Green          |
+| **CLK** (Clock)    | **D5**              | **GPIO 14** | Software SPI clock       | 🔵 Blue           |
 
-> **Important Power Note:** Connect MAX7219 **VCC to the 5V pin** on the D1 Mini (NOT 3.3V). The MAX7219 driver chips require 5V for bright, even LED matrix illumination, but their input logic lines safely accept the 3.3V signals from D5, D7, and D8.
+> **Important Power Note:** Connect MAX7219 **VCC to the 5V pin** on the D1 Mini (NOT 3.3V). A genuine MAX7219 specifies a 3.5 V minimum logic-high input at its stated 5 V supply conditions, so 3.3 V ESP8266 signals are not guaranteed to meet its specification. For reliable logic levels use a 5 V powered 74HCT125 or equivalent buffer on DIN, CS, and CLK, and connect all grounds together. Test the actual module and power supply in the finished enclosure.
 
 ---
 

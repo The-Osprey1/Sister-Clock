@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SisterClock ✨ Printable Setup & Gift Card</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      margin: 0;
+      padding: 2rem 1rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .no-print {
+      max-width: 650px;
+      width: 100%;
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+    .print-btn {
+      background: #f43f5e;
+      color: white;
+      border: none;
+      padding: 0.8rem 1.6rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 9999px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(244, 63, 94, 0.4);
+      transition: all 0.2s;
+    }
+    .print-btn:hover {
+      background: #e11d48;
+      transform: translateY(-1px);
+    }
+    .card-container {
+      width: 100%;
+      max-width: 600px;
+      background: #ffffff;
+      color: #1e293b;
+      border-radius: 20px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+      border: 2px dashed #cbd5e1;
+      position: relative;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 1.5rem;
+      border-bottom: 2px solid #fecdd3;
+      padding-bottom: 1rem;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      color: #e11d48;
+    }
+    .header p {
+      margin: 0.3rem 0 0;
+      color: #64748b;
+      font-size: 0.95rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .step-box {
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      border-radius: 14px;
+      padding: 1.2rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .step-title {
+      font-weight: 700;
+      color: #9f1239;
+      margin-bottom: 0.6rem;
+      font-size: 0.95rem;
+    }
+    .qr-holder {
+      background: white;
+      padding: 10px;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      margin-bottom: 0.8rem;
+    }
+    .step-desc {
+      font-size: 0.8rem;
+      color: #475569;
+      line-height: 1.35;
+    }
+    .step-code {
+      font-family: monospace;
+      font-weight: bold;
+      background: #ffe4e6;
+      color: #be123c;
+      padding: 2px 6px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-top: 4px;
+    }
+    .footer {
+      text-align: center;
+      border-top: 1px solid #f1f5f9;
+      padding-top: 1rem;
+      color: #64748b;
+      font-size: 0.85rem;
+    }
+    .footer strong {
+      color: #e11d48;
+    }
+
+    @media print {
+      body {
+        background: white;
+        color: black;
+        padding: 0;
+      }
+      .no-print {
+        display: none;
+      }
+      .card-container {
+        box-shadow: none;
+        border: 2px dashed #94a3b8;
+        max-width: 100%;
+        margin: 0 auto;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="no-print">
+    <h2 style="margin-top:0; color:#fca5a5;">SisterClock ✨ Gift Box Setup Card</h2>
+    <p style="color:#94a3b8; font-size:0.9rem;">Print this card out (or cut it along the dashed line) to include in the 3D-printed clock box!</p>
+    <button class="print-btn" onclick="window.print()">🖨️ Print Setup Card</button>
+  </div>
+
+  <div class="card-container">
+    <div class="header">
+      <h1>SisterClock ✨ Quick Start</h1>
+      <p>Custom LED Matrix Clock • Handcrafted with Love</p>
+    </div>
+
+    <div class="grid">
+      <!-- Step 1: Connect Wi-Fi -->
+      <div class="step-box">
+        <div class="step-title">1. Point Camera to Connect</div>
+        <div class="qr-holder" id="qr-wifi"></div>
+        <div class="step-desc">
+          Scan with your phone camera to auto-join the clock's Wi-Fi network:
+          <br><span class="step-code">SisterClock-Setup</span>
+          <br><small style="color:#64748b;">Password: <b>bestbrother</b></small>
+        </div>
+      </div>
+
+      <!-- Step 2: Open Settings -->
+      <div class="step-box">
+        <div class="step-title">2. Open Clock Customizer</div>
+        <div class="qr-holder" id="qr-url"></div>
+        <div class="step-desc">
+          Scan to open your personal clock controls in Safari or Chrome:
+          <br><span class="step-code">http://192.168.4.1</span>
+          <br><small style="color:#64748b;">Or once on Wi-Fi: <b>sisterclock.local</b></small>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      ❤️ <strong>Gifted by the Best Brother!</strong> • 12h/24h Time • 3 Clock Styles • Alarm Looks • Dimmable Glow
+    </div>
+  </div>
+
+  <script>
+    // 1. WiFi QR Code (WIFI:S:<SSID>;T:<WPA|WEP|nopass>;P:<password>;;)
+    new QRCode(document.getElementById("qr-wifi"), {
+      text: "WIFI:S:SisterClock-Setup;T:WPA;P:bestbrother;;",
+      width: 140,
+      height: 140,
+      colorDark: "#1e1b4b",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+
+    // 2. Setup URL QR Code
+    new QRCode(document.getElementById("qr-url"), {
+      text: "http://192.168.4.1",
+      width: 140,
+      height: 140,
+      colorDark: "#881337",
+      colorLight: "#ffffff",
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  </script>
+
+</body>
+</html>

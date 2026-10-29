@@ -39,7 +39,7 @@ The MAX7219 matrix LEDs are very bright point-light sources. To give the numbers
 
 ### Step 1: Flash Firmware Before Assembly
 Always flash the firmware onto the D1 Mini **before** mounting it inside the case:
-- Open `SisterClock\web_installer\index.html` in Chrome/Edge, OR
+- Serve `web_installer/` over HTTPS or localhost and open the page in Chrome/Edge, OR
 - Run `.\flash.ps1` in PowerShell, OR
 - Run `pio run -t upload` with PlatformIO.
 

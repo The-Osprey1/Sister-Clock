@@ -14,6 +14,7 @@
 param(
     [string]$Port = "",
     [int]$Baud = 460800,
+    [string]$Python = "",
     [switch]$Erase
 )
 
@@ -40,7 +41,7 @@ Write-Host "[OK] Located firmware: $FirmwareBin ($([math]::Round($fwSize/1KB, 1)
 # Detect or validate COM port
 if ([string]::IsNullOrWhiteSpace($Port)) {
     Write-Host "Searching for connected serial ports..." -ForegroundColor Cyan
-    $availablePorts = [System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object -Unique
+    $availablePorts = @([System.IO.Ports.SerialPort]::GetPortNames() | Sort-Object -Unique)
     
     if ($availablePorts.Count -eq 0) {
         Write-Host "[ERROR] No serial COM ports detected!" -ForegroundColor Red
@@ -51,30 +52,41 @@ if ([string]::IsNullOrWhiteSpace($Port)) {
         Write-Host "[OK] Automatically detected: $Port" -ForegroundColor Green
     } else {
         Write-Host "Multiple COM ports detected: $($availablePorts -join ', ')" -ForegroundColor Yellow
-        Write-Host "Specify the clock's port with -Port COMx before flashing." -ForegroundColor Yellow
+        Write-Host "Specify the clock port with -Port COMx and retry." -ForegroundColor Yellow
         exit 1
     }
 } else {
     Write-Host "Using specified port: $Port" -ForegroundColor Cyan
 }
 
-# Verify Python & esptool
-Write-Host "Checking esptool..." -ForegroundColor Cyan
-try {
-    $ver = python -m esptool version 2>&1
-    if ($LASTEXITCODE -ne 0) { throw "esptool is not available" }
-    Write-Host "[OK] $ver" -ForegroundColor Green
-} catch {
-    Write-Host "[ERROR] esptool is not installed in Python!" -ForegroundColor Red
-    Write-Host "Install it with: pip install esptool" -ForegroundColor Yellow
+# Locate an interpreter; -Python accepts a full path when Python is not on PATH.
+if (-not $Python) {
+    $candidates = @((Join-Path $env:USERPROFILE "anaconda3/python.exe"))
+    $found = Get-Command python.exe -ErrorAction SilentlyContinue
+    if ($found) { $candidates += $found.Source }
+    foreach ($candidate in $candidates) {
+        if (Test-Path $candidate) {
+            & $candidate -m esptool version 2>$null | Out-Null
+            if ($LASTEXITCODE -eq 0) { $Python = $candidate; break }
+        }
+    }
+}
+if (-not $Python -or -not (Test-Path $Python)) {
+    Write-Host "[ERROR] Python with esptool not found. Install esptool and pass -Python with the interpreter path." -ForegroundColor Red
     exit 1
 }
+& $Python -m esptool version
+if ($LASTEXITCODE -ne 0) { Write-Host "[ERROR] esptool is unavailable in $Python" -ForegroundColor Red; exit 1 }
+    exit 1
+}
+& $Python -m esptool version
+if ($LASTEXITCODE -ne 0) { Write-Host "[ERROR] esptool is unavailable in $Python" -ForegroundColor Red; exit 1 }
 
 # Optional flash erase
 if ($Erase) {
     Write-Host ""
     Write-Host "Erasing flash memory on $Port..." -ForegroundColor Yellow
-    python -m esptool --chip esp8266 --port $Port erase_flash
+    & $Python -m esptool --chip esp8266 --port $Port erase_flash
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[ERROR] Flash erase failed." -ForegroundColor Red
         exit $LASTEXITCODE
@@ -85,7 +97,7 @@ if ($Erase) {
 # Flash firmware
 Write-Host ""
 Write-Host "Flashing SisterClock firmware to $Port at $Baud baud..." -ForegroundColor Magenta
-python -m esptool --chip esp8266 --port $Port --baud $Baud write_flash --flash_size detect 0x0 $FirmwareBin
+& $Python -m esptool --chip esp8266 --port $Port --baud $Baud write_flash --flash_size detect 0x0 $FirmwareBin
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""

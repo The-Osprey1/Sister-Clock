@@ -167,7 +167,7 @@ def test_clock_and_alarm_styles_backend():
         content = f.read()
 
     # Verify global variables and defaults
-    assert "int clockStyle = 0;" in content
+    assert "int clockStyle = 1;" in content
     assert "int alarmStyle = 0;" in content
 
     # Verify endpoints registered
@@ -206,12 +206,12 @@ def test_mobile_customizer_ui_elements():
     assert 'id="clock-style-2"' in content
     assert "Minimal" in content
     assert "Day Tag" in content
-    assert "Heartbeat" in content
+    assert "Time + Seconds" in content
 
     # Show date toggle
     assert 'id="btn-showdate-yes"' in content
     assert 'id="btn-showdate-no"' in content
-    assert "Clock Time Only" in content
+    assert "Hide Date" in content
 
     # Touch brightness slider & presets
     assert 'id="mobile-bright-slider"' in content
@@ -258,3 +258,49 @@ def test_alarm_style_render_modes():
     assert "\\x8F" in content
     # Style 2: Wake-Up text banner
     assert "WAKE UP!" in content
+
+
+def test_reset_wifi_endpoint():
+    with open(INO_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert 'server.on("/reset_wifi", HTTP_POST,' in content
+    assert 'doc["ssid"] = "";' in content
+    assert 'doc["password"] = "";' in content
+    assert 'writeConfigSafely(doc);' in content
+    assert 'ESP.restart();' in content
+
+def test_ap_setup_banner_display():
+    with open(INO_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verify friendly scrolling setup banner in AP mode
+    assert 'CONNECT PHONE TO: SisterClock-Setup' in content
+    assert '192.168.4.1' in content
+    assert '\\x8F SETUP \\x8F' in content
+    assert 'dnsServer.processNextRequest();' in content
+
+def test_mobile_pwa_and_setup_button():
+    with open(HTML_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # PWA mobile app meta tags
+    assert 'name="apple-mobile-web-app-capable" content="yes"' in content
+    assert 'name="apple-mobile-web-app-title" content="SisterClock"' in content
+    assert 'name="theme-color" content="#18102a"' in content
+
+    # One-tap switch Wi-Fi / setup mode button and handler
+    assert "resetWifiAndSetup()" in content
+    assert "Connect to New Wi-Fi (Setup Mode)" in content
+    assert 'fetch("/reset_wifi"' in content
+
+def test_printable_qr_card():
+    qr_card_path = os.path.join(WEB_INSTALLER_DIR, "qr_setup_card.html")
+    assert os.path.exists(qr_card_path), "qr_setup_card.html must exist"
+    with open(qr_card_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "WIFI:S:SisterClock-Setup;T:WPA;P:bestbrother;;" in content
+    assert "http://192.168.4.1" in content
+    assert "Print Setup Card" in content
+    assert "SisterClock ✨ Quick Start" in content
