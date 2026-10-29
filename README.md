@@ -8,6 +8,7 @@
 
 While standard matrix clocks display time and weather, **SisterClock** is customized as a thoughtful, delightful gift:
 
+- **Mobile Customizer Experience:** When connecting with a smartphone, an instant hero customizer card lets her personalize time format (12h vs 24h military), select between 3 clock display looks, choose between 3 animated alarm alerts, switch to a clock-only (no date) mode, and adjust display glow with touch-friendly presets.
 - **Sister Affirmations & Heartbeat Cheer:** Periodically surprises her with uplifting messages throughout the day (e.g., *"HAVE A WONDERFUL DAY, SIS! ❤️"*, *"YOU MAKE THE WORLD BRIGHTER! ✨"*, *"REMEMBER TO DRINK WATER & SMILE :)"*, *"LOVE YOU TO THE MOON & BACK! ❤️"*).
 - **Custom Love Notes & Messages:** Send real-time messages directly to her desk or nightstand from the Web UI or via simple HTTP requests.
 - **Cute Matrix Glyphs:** Typing `<3` or `[LOVE]` automatically renders an animated glowing heart on the LED matrix! Also supports `[STAR]`, `[SMILE]`, `[MOON]`, and `[BELL]`.

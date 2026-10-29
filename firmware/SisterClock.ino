@@ -241,6 +241,8 @@ bool showDayOfWeek = true;
 bool showDate = false;
 bool showHumidity = false;
 bool colonBlinkEnabled = true;
+int clockStyle = 0;  // 0: Minimal Centered, 1: Day of Week + Time, 2: Time + Seconds
+int alarmStyle = 0;  // 0: Invert Strobe, 1: Bell & Heart, 2: Wake-Up Banner
 char ntpServer1[64] = "pool.ntp.org";
 char ntpServer2[256] = "time.nist.gov";
 char customMessage[121] = "";
@@ -503,6 +505,8 @@ void loadConfig() {
     doc[F("showDate")] = false;
     doc[F("showHumidity")] = showHumidity;
     doc[F("colonBlinkEnabled")] = colonBlinkEnabled;
+    doc[F("clockStyle")] = 0;
+    doc[F("alarmStyle")] = 0;
     doc[F("ntpServer1")] = ntpServer1;
     doc[F("ntpServer2")] = ntpServer2;
     doc[F("dimmingEnabled")] = dimmingEnabled;
@@ -601,6 +605,8 @@ void loadConfig() {
   showDate = doc["showDate"] | false;
   showHumidity = doc["showHumidity"] | false;
   colonBlinkEnabled = doc.containsKey("colonBlinkEnabled") ? doc["colonBlinkEnabled"].as<bool>() : true;
+  clockStyle = doc["clockStyle"] | (showDayOfWeek ? 1 : (colonBlinkEnabled ? 2 : 0));
+  alarmStyle = doc["alarmStyle"] | 0;
   showWeatherDescription = doc["showWeatherDescription"] | false;
   showFullTemp = doc["showFullTemp"] | false;
   showFullDescription = doc["showFullDescription"] | false;
@@ -1929,6 +1935,9 @@ static String statusSectionJson(int section, SnsType snsType, time_t nowTime) {
         doc["flipDisplay"] = flipDisplay;
         doc["twelveHourToggle"] = twelveHourToggle;
         doc["showDate"] = showDate;
+        doc["showDayOfWeek"] = showDayOfWeek;
+        doc["clockStyle"] = clockStyle;
+        doc["alarmStyle"] = alarmStyle;
         doc["showHumidity"] = showHumidity;
         doc["ntpServer1"] = String(ntpServer1);
         String nsUrl = String(ntpServer2);
@@ -2452,14 +2461,30 @@ void setupWebServer() {
     request->send(200, "application/json", "{\"ok\":true}");
   };
 
+  // SisterClock Customizer endpoints available in BOTH AP setup mode and normal Wi-Fi mode
+  server.on("/set_brightness", HTTP_POST, setHandler);
+  server.on("/set_flip", HTTP_POST, setHandler);
+  server.on("/set_twelvehour", HTTP_POST, setHandler);
+  server.on("/set_dayofweek", HTTP_POST, setHandler);
+  server.on("/set_showdate", HTTP_POST, setHandler);
+  server.on("/set_humidity", HTTP_POST, setHandler);
+  server.on("/set_colon_blink", HTTP_POST, setHandler);
+  server.on("/set_clock_style", HTTP_POST, setHandler);
+  server.on("/set_alarm_style", HTTP_POST, setHandler);
+  server.on("/test_alarm", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!alarmRinging) {
+      alarmRinging = true;
+      alarmStopAt = millis() + 10000;
+      alarmPreviousDisplayMode = displayMode;
+      displayMode = 0;
+    } else {
+      alarmRinging = false;
+      P.setInvert(false);
+    }
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
   if (!apSetupOnly) {
-    server.on("/set_brightness", HTTP_POST, setHandler);
-    server.on("/set_flip", HTTP_POST, setHandler);
-    server.on("/set_twelvehour", HTTP_POST, setHandler);
-    server.on("/set_dayofweek", HTTP_POST, setHandler);
-    server.on("/set_showdate", HTTP_POST, setHandler);
-    server.on("/set_humidity", HTTP_POST, setHandler);
-    server.on("/set_colon_blink", HTTP_POST, setHandler);
     server.on("/set_language", HTTP_POST, setHandler);
     server.on("/set_weatherdesc", HTTP_POST, setHandler);
     server.on("/set_units", HTTP_POST, setHandler);
@@ -4924,6 +4949,7 @@ void executeAction(const String &action, const String &value) {
   } else if (action == "twelvehour" || action == "twelve_hour") {
     twelveHourToggle = hasValue ? boolVal : !twelveHourToggle;
     if (!hasValue && displayMode != 0) { goToMode("0"); }
+    saveConfigRuntime();
 
   } else if (action == "dayofweek" || action == "show_dayofweek") {
     showDayOfWeek = hasValue ? boolVal : !showDayOfWeek;
@@ -4934,7 +4960,25 @@ void executeAction(const String &action, const String &value) {
     if (showDate && !newVal && displayMode == 5) { advanceDisplayMode(true); }
     showDate = newVal;
     if (!hasValue && showDate) { goToMode("5"); }
+    saveConfigRuntime();
 
+  } else if (action == "clock_style") {
+    int val = value.toInt();
+    if (val >= 0 && val <= 2) {
+      clockStyle = val;
+      if (clockStyle == 0) { showDayOfWeek = false; colonBlinkEnabled = false; }
+      else if (clockStyle == 1) { showDayOfWeek = true; colonBlinkEnabled = true; }
+      else if (clockStyle == 2) { showDayOfWeek = false; colonBlinkEnabled = true; }
+      clockScrollDone = false;
+      forceMessageRestart = true;
+      saveConfigRuntime();
+    }
+  } else if (action == "alarm_style") {
+    int val = value.toInt();
+    if (val >= 0 && val <= 2) {
+      alarmStyle = val;
+      saveConfigRuntime();
+    }
   } else if (action == "colon_blink" || action == "animated_seconds") {
     colonBlinkEnabled = hasValue ? boolVal : !colonBlinkEnabled;
     if (!hasValue && displayMode != 0) { goToMode("0"); }
@@ -6174,6 +6218,8 @@ bool saveConfigRuntime() {
   doc["showFullTemp"] = showFullTemp;
   doc["showFullDescription"] = showFullDescription;
   doc["colonBlinkEnabled"] = colonBlinkEnabled;
+  doc["clockStyle"] = clockStyle;
+  doc["alarmStyle"] = alarmStyle;
   doc["clockOnlyDuringDimming"] = clockOnlyDuringDimming;
   doc["showWeatherDescription"] = showWeatherDescription;
   doc["weatherUnits"] = weatherUnits;
@@ -8446,7 +8492,7 @@ void showAlarmMode() {
 
   static bool alarmInvert = false;
   static unsigned long alarmLastInvertSwitch = 0;
-  const unsigned long alarmInvertInterval = 500;
+  const unsigned long alarmInvertInterval = 400;
 
   if (millis() - alarmLastInvertSwitch >= alarmInvertInterval) {
     alarmInvert = !alarmInvert;
@@ -8456,18 +8502,38 @@ void showAlarmMode() {
     time_t nowTime = time(nullptr);
     localtime_r(&nowTime, &timeinfo);
 
-    char buf[9];
+    char buf[12];
     strftime(buf, sizeof(buf), twelveHourToggle ? "%I:%M" : "%H:%M", &timeinfo);
-
-    String timeString = String(buf);
-    if (alarmInvert) {
-      timeString.replace(":", " ");
-    }
+    const char *timeStr = (buf[0] == '0' && twelveHourToggle) ? buf + 1 : buf;
+    String timeString = String(timeStr);
 
     P.setTextAlignment(PA_CENTER);
     P.setCharSpacing(1);
-    P.setInvert(alarmInvert);
-    P.print(timeString.c_str());
+
+    if (alarmStyle == 1) {
+      // Style 1: Bouncing Bell & Heart
+      P.setInvert(false);
+      if (alarmInvert) {
+        P.print(timeString + " \x8F");
+      } else {
+        P.print("\xBF " + timeString);
+      }
+    } else if (alarmStyle == 2) {
+      // Style 2: Wake-Up Marquee Banner
+      P.setInvert(false);
+      if (alarmInvert) {
+        P.print("WAKE UP!");
+      } else {
+        P.print(timeString);
+      }
+    } else {
+      // Style 0: Classic Inverted Strobe
+      if (alarmInvert) {
+        timeString.replace(":", " ");
+      }
+      P.setInvert(alarmInvert);
+      P.print(timeString.c_str());
+    }
   }
 }
 

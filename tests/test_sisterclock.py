@@ -160,3 +160,101 @@ def test_firmware_binary_strings():
     assert b"SisterClock-Setup" in bin_data, "Binary must contain SisterClock-Setup SSID"
     assert b"SUPPORTING ESPTIMECAST KEEPS THE PROJECT ALIVE" not in bin_data
     assert b"buymeacoffee.com" not in bin_data
+
+
+def test_clock_and_alarm_styles_backend():
+    with open(INO_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Verify global variables and defaults
+    assert "int clockStyle = 0;" in content
+    assert "int alarmStyle = 0;" in content
+
+    # Verify endpoints registered
+    assert 'server.on("/set_clock_style", HTTP_POST, setHandler);' in content
+    assert 'server.on("/set_alarm_style", HTTP_POST, setHandler);' in content
+    assert 'server.on("/test_alarm", HTTP_POST,' in content
+
+    # Verify action handling
+    assert 'action == "clock_style"' in content
+    assert 'action == "alarm_style"' in content
+
+    # Verify config serialization and saving
+    assert 'doc["clockStyle"] = clockStyle;' in content
+    assert 'doc["alarmStyle"] = alarmStyle;' in content
+    assert 'clockStyle = doc["clockStyle"]' in content
+    assert 'alarmStyle = doc["alarmStyle"]' in content
+
+def test_mobile_customizer_ui_elements():
+    with open(HTML_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Hero card header
+    assert 'id="sister-customizer"' in content
+    assert "Sister's Clock Customizer" in content
+    assert "mobile-hero-card" in content
+
+    # 12h vs 24h controls
+    assert 'id="btn-12h"' in content
+    assert 'id="btn-24h"' in content
+    assert "12-Hour (AM/PM)" in content
+    assert "24-Hour (Military)" in content
+
+    # 3 Clock face looks
+    assert 'id="clock-style-0"' in content
+    assert 'id="clock-style-1"' in content
+    assert 'id="clock-style-2"' in content
+    assert "Minimal" in content
+    assert "Day Tag" in content
+    assert "Heartbeat" in content
+
+    # Show date toggle
+    assert 'id="btn-showdate-yes"' in content
+    assert 'id="btn-showdate-no"' in content
+    assert "Clock Time Only" in content
+
+    # Touch brightness slider & presets
+    assert 'id="mobile-bright-slider"' in content
+    assert 'id="mobile-bright-val"' in content
+    assert "Night (1)" in content
+    assert "Cozy (5)" in content
+    assert "Day (10)" in content
+    assert "Max (15)" in content
+
+    # 3 Alarm alert styles & test alarm
+    assert 'id="alarm-style-0"' in content
+    assert 'id="alarm-style-1"' in content
+    assert 'id="alarm-style-2"' in content
+    assert "Strobe Flash" in content
+    assert "Bell & Heart" in content
+    assert "Wake-Up" in content
+    assert "testAlarmNow()" in content
+
+def test_mobile_customizer_js_handlers():
+    with open(HTML_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    assert "function setTwelveHourMode(" in content
+    assert "function chooseClockStyle(" in content
+    assert "function chooseAlarmStyle(" in content
+    assert "function setShowDateMode(" in content
+    assert "function updateMobileBrightness(" in content
+    assert "function setBrightnessPreset(" in content
+    assert "function testAlarmNow(" in content
+
+    # Verify config.json initialization
+    assert "b12.classList.toggle(\"active\", is12hMode);" in content
+    assert "clock-style-" in content
+    assert "alarm-style-" in content
+
+def test_alarm_style_render_modes():
+    with open(INO_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    # Style 0: Inverted Strobe
+    assert "P.setInvert(alarmInvert);" in content
+    # Style 1: Bouncing Bell & Heart
+    assert "\\xBF" in content
+    assert "\\x8F" in content
+    # Style 2: Wake-Up text banner
+    assert "WAKE UP!" in content

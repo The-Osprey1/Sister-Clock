@@ -1422,6 +1422,227 @@ const char index_html[] PROGMEM = R"rawliteral(
         margin-top: 0.5rem;
         margin-bottom: 2rem;
       }
+      /* --- Sister's Mobile Hero Customizer --- */
+      .mobile-hero-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 16px;
+        padding: 1.35rem;
+        margin-top: 1.25rem;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+        backdrop-filter: blur(10px);
+      }
+      .mobile-hero-card h2 {
+        margin-top: 0;
+        margin-bottom: 0.25rem;
+        font-size: 1.35rem;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .mobile-hero-subtitle {
+        color: #fca5a5;
+        font-size: 0.88rem;
+        margin-bottom: 1.25rem;
+        opacity: 0.95;
+      }
+      .customizer-section {
+        background: rgba(0, 0, 0, 0.22);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        padding: 1rem;
+        margin-bottom: 1.15rem;
+      }
+      .customizer-section-title {
+        font-size: 0.98rem;
+        font-weight: 600;
+        color: #fecdd3;
+        margin-bottom: 0.25rem;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+      .customizer-section-desc {
+        font-size: 0.8rem;
+        color: #94a3b8;
+        margin-bottom: 0.75rem;
+        line-height: 1.3;
+      }
+      /* Toggle Groups (Segmented controls) */
+      .toggle-group {
+        display: flex;
+        gap: 0.5rem;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 10px;
+        padding: 4px;
+        border: 1px solid rgba(255, 255, 255, 0.06);
+      }
+      .toggle-btn {
+        flex: 1;
+        padding: 0.65rem 0.5rem;
+        border: 1px solid transparent;
+        border-radius: 8px;
+        background: transparent;
+        color: #cbd5e1;
+        font-size: 0.88rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.35rem;
+        min-height: 44px;
+      }
+      .toggle-btn:hover {
+        background: rgba(255, 255, 255, 0.06);
+        color: #ffffff;
+      }
+      .toggle-btn.active {
+        background: var(--accent-color, #f43f5e);
+        color: #ffffff;
+        font-weight: 600;
+        box-shadow: 0 4px 14px rgba(244, 63, 94, 0.4);
+      }
+      /* Style Cards Grid (3 Options) */
+      .style-cards-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+        gap: 0.65rem;
+      }
+      .style-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1.5px solid rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+        padding: 0.75rem 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 75px;
+      }
+      .style-card:hover {
+        background: rgba(255, 255, 255, 0.08);
+        border-color: rgba(244, 63, 94, 0.5);
+      }
+      .style-card.active {
+        background: rgba(244, 63, 94, 0.16);
+        border-color: var(--accent-color, #f43f5e);
+        box-shadow: 0 0 12px rgba(244, 63, 94, 0.35);
+      }
+      .style-card-badge {
+        font-family: monospace;
+        font-size: 0.85rem;
+        font-weight: bold;
+        color: #f43f5e;
+        background: rgba(0, 0, 0, 0.35);
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        margin-bottom: 0.4rem;
+        border: 1px solid rgba(244, 63, 94, 0.3);
+      }
+      .style-card.active .style-card-badge {
+        background: #f43f5e;
+        color: #ffffff;
+      }
+      .style-card-title {
+        font-size: 0.82rem;
+        font-weight: 600;
+        color: #e2e8f0;
+      }
+      .style-card-desc {
+        font-size: 0.7rem;
+        color: #94a3b8;
+        margin-top: 0.2rem;
+      }
+      /* Brightness Slider & Presets */
+      .bright-slider-row {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 0.75rem;
+      }
+      .bright-slider-row input[type="range"] {
+        flex: 1;
+        accent-color: var(--accent-color, #f43f5e);
+        height: 8px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .bright-val-pill {
+        min-width: 52px;
+        text-align: center;
+        background: rgba(244, 63, 94, 0.2);
+        border: 1px solid rgba(244, 63, 94, 0.4);
+        border-radius: 6px;
+        padding: 0.25rem 0.4rem;
+        font-weight: 600;
+        font-size: 0.85rem;
+        color: #fecdd3;
+      }
+      .preset-pills-row {
+        display: flex;
+        gap: 0.4rem;
+        flex-wrap: wrap;
+      }
+      .preset-pill {
+        flex: 1;
+        min-width: 60px;
+        padding: 0.45rem 0.3rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #e2e8f0;
+        font-size: 0.78rem;
+        font-weight: 500;
+        cursor: pointer;
+        text-align: center;
+        transition: all 0.2s ease;
+        min-height: 38px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .preset-pill:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .preset-pill.active {
+        background: var(--accent-color, #f43f5e);
+        border-color: var(--accent-color, #f43f5e);
+        color: #ffffff;
+      }
+      /* Action Buttons */
+      .sister-action-btn {
+        width: 100%;
+        padding: 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(244, 63, 94, 0.4);
+        background: linear-gradient(135deg, rgba(244, 63, 94, 0.25) 0%, rgba(225, 29, 72, 0.4) 100%);
+        color: #ffffff;
+        font-weight: 600;
+        font-size: 0.92rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        min-height: 46px;
+        margin-top: 0.6rem;
+      }
+      .sister-action-btn:hover {
+        background: linear-gradient(135deg, rgba(244, 63, 94, 0.45) 0%, rgba(225, 29, 72, 0.6) 100%);
+        box-shadow: 0 4px 15px rgba(244, 63, 94, 0.35);
+      }
+      .sister-action-btn:active {
+        transform: scale(0.98);
+      }
     </style>
   </head>
   <body>
@@ -1540,6 +1761,97 @@ const char index_html[] PROGMEM = R"rawliteral(
           </select>
         </div>
       </div>
+      <div class="mobile-hero-card" id="sister-customizer">
+        <h2>✨ Sister's Clock Customizer</h2>
+        <div class="mobile-hero-subtitle">Personalize your clock display, alarms, and glow with a tap</div>
+
+        <!-- 1. 12-Hour vs 24-Hour (Military) Time -->
+        <div class="customizer-section">
+          <div class="customizer-section-title">⏰ Time Format</div>
+          <div class="customizer-section-desc">Choose between standard 12-hour or 24-hour military time.</div>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn" id="btn-12h" onclick="setTwelveHourMode(true)">☀️ 12-Hour (AM/PM)</button>
+            <button type="button" class="toggle-btn" id="btn-24h" onclick="setTwelveHourMode(false)">🌙 24-Hour (Military)</button>
+          </div>
+        </div>
+
+        <!-- 2. Clock Display Face Styles (3 Looks) -->
+        <div class="customizer-section">
+          <div class="customizer-section-title">🎨 Clock Display Look</div>
+          <div class="customizer-section-desc">Select how the clock time is shown on the LED matrix.</div>
+          <div class="style-cards-grid" id="clock-style-grid">
+            <div class="style-card" id="clock-style-0" onclick="chooseClockStyle(0)">
+              <div class="style-card-badge">10:42</div>
+              <div class="style-card-title">Minimal</div>
+              <div class="style-card-desc">Clean & steady</div>
+            </div>
+            <div class="style-card" id="clock-style-1" onclick="chooseClockStyle(1)">
+              <div class="style-card-badge">MON 10:42</div>
+              <div class="style-card-title">Day Tag</div>
+              <div class="style-card-desc">With weekday</div>
+            </div>
+            <div class="style-card" id="clock-style-2" onclick="chooseClockStyle(2)">
+              <div class="style-card-badge">10:42 ♥</div>
+              <div class="style-card-title">Heartbeat</div>
+              <div class="style-card-desc">Pulsing colon</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Show Date or Time-Only Toggle -->
+        <div class="customizer-section">
+          <div class="customizer-section-title">📅 Date Display</div>
+          <div class="customizer-section-desc">Choose whether the date scrolls by, or keep it strictly clock time.</div>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn" id="btn-showdate-yes" onclick="setShowDateMode(true)">📅 Show Date</button>
+            <button type="button" class="toggle-btn" id="btn-showdate-no" onclick="setShowDateMode(false)">⏱️ Clock Time Only</button>
+          </div>
+        </div>
+
+        <!-- 4. Interactive Touch Brightness -->
+        <div class="customizer-section">
+          <div class="customizer-section-title">💡 Brightness & Glow</div>
+          <div class="customizer-section-desc">Slide or tap a preset to adjust LED brightness instantly.</div>
+          <div class="bright-slider-row">
+            <input type="range" id="mobile-bright-slider" min="0" max="15" value="10" oninput="updateMobileBrightness(this.value)">
+            <span class="bright-val-pill" id="mobile-bright-val">10 / 15</span>
+          </div>
+          <div class="preset-pills-row">
+            <button type="button" class="preset-pill" onclick="setBrightnessPreset(1)">🌙 Night (1)</button>
+            <button type="button" class="preset-pill" onclick="setBrightnessPreset(5)">🛋️ Cozy (5)</button>
+            <button type="button" class="preset-pill" onclick="setBrightnessPreset(10)">☀️ Day (10)</button>
+            <button type="button" class="preset-pill" onclick="setBrightnessPreset(15)">🔥 Max (15)</button>
+          </div>
+        </div>
+
+        <!-- 5. Alarm Alert Style (3 Looks) & Test -->
+        <div class="customizer-section">
+          <div class="customizer-section-title">🔔 Alarm Alert Style</div>
+          <div class="customizer-section-desc">Choose the animation shown when the alarm rings.</div>
+          <div class="style-cards-grid" id="alarm-style-grid">
+            <div class="style-card" id="alarm-style-0" onclick="chooseAlarmStyle(0)">
+              <div class="style-card-badge">🚨 FLASH</div>
+              <div class="style-card-title">Strobe Flash</div>
+              <div class="style-card-desc">Inverted strobe</div>
+            </div>
+            <div class="style-card" id="alarm-style-1" onclick="chooseAlarmStyle(1)">
+              <div class="style-card-badge">🔔 ♥ 🔔</div>
+              <div class="style-card-title">Bell & Heart</div>
+              <div class="style-card-desc">Warm & gentle</div>
+            </div>
+            <div class="style-card" id="alarm-style-2" onclick="chooseAlarmStyle(2)">
+              <div class="style-card-badge">WAKE UP!</div>
+              <div class="style-card-title">Wake-Up</div>
+              <div class="style-card-desc">Text banner</div>
+            </div>
+          </div>
+          <button type="button" class="sister-action-btn" onclick="testAlarmNow()">🔔 Test Alarm on Clock</button>
+        </div>
+
+        <!-- 6. Sister Affirmation Quick Send -->
+        <button type="button" class="sister-action-btn" style="margin-top:0.5rem;" onclick="sendAffirmationNow()">💌 Send Sister Affirmation to Clock ❤️</button>
+      </div>
+
       <div id="quickactions" class="no-ap">
         <h2>Quick Actions</h2>
         <div class="quick-grid">
@@ -2665,6 +2977,41 @@ const char index_html[] PROGMEM = R"rawliteral(
 
             initClockOnlyDuringDimming(data);
 
+            // --- Initialize Sister Clock Customizer Controls ---
+            const is12hMode = !!data.twelveHourToggle;
+            const b12 = document.getElementById("btn-12h");
+            const b24 = document.getElementById("btn-24h");
+            if (b12 && b24) {
+              b12.classList.toggle("active", is12hMode);
+              b24.classList.toggle("active", !is12hMode);
+            }
+
+            const cStyle = typeof data.clockStyle !== "undefined" ? data.clockStyle : 0;
+            [0, 1, 2].forEach((i) => {
+              const el = document.getElementById("clock-style-" + i);
+              if (el) el.classList.toggle("active", i === cStyle);
+            });
+
+            const aStyle = typeof data.alarmStyle !== "undefined" ? data.alarmStyle : 0;
+            [0, 1, 2].forEach((i) => {
+              const el = document.getElementById("alarm-style-" + i);
+              if (el) el.classList.toggle("active", i === aStyle);
+            });
+
+            const showDateVal = typeof data.showDate !== "undefined" ? !!data.showDate : true;
+            const bDateYes = document.getElementById("btn-showdate-yes");
+            const bDateNo = document.getElementById("btn-showdate-no");
+            if (bDateYes && bDateNo) {
+              bDateYes.classList.toggle("active", showDateVal);
+              bDateNo.classList.toggle("active", !showDateVal);
+            }
+
+            const bVal = typeof data.regularBrightness !== "undefined" ? data.regularBrightness : (typeof data.brightness !== "undefined" ? data.brightness : 10);
+            const mSlider = document.getElementById("mobile-bright-slider");
+            const mVal = document.getElementById("mobile-bright-val");
+            if (mSlider) mSlider.value = bVal;
+            if (mVal) mVal.textContent = bVal + " / 15";
+
             // --- Sister Affirmations toggle ---
             const sisterAffirmationsEl = document.getElementById("sisterAffirmations");
             if (sisterAffirmationsEl) {
@@ -3613,6 +3960,108 @@ const char index_html[] PROGMEM = R"rawliteral(
       // --- Legacy Donation message opt-out toggle (no reboot) ---
       function setHideDonationMsg(val) {
         setSisterAffirmations(!val);
+      }
+
+      // --- Sister Clock Mobile Customizer Handlers ---
+      function setTwelveHourMode(is12h) {
+        const b12 = document.getElementById("btn-12h");
+        const b24 = document.getElementById("btn-24h");
+        if (b12) b12.classList.toggle("active", is12h);
+        if (b24) b24.classList.toggle("active", !is12h);
+        const legacyEl = document.getElementById("twelveHourToggle");
+        if (legacyEl) legacyEl.checked = is12h;
+        fetch("/set_twelvehour", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "value=" + (is12h ? "1" : "0"),
+        })
+          .then(() => showToast(is12h ? "✓ 12-Hour (AM/PM) mode active" : "✓ 24-Hour (Military) mode active", 2000))
+          .catch((e) => console.error("Error setting twelvehour:", e));
+      }
+
+      function chooseClockStyle(idx) {
+        [0, 1, 2].forEach((i) => {
+          const el = document.getElementById("clock-style-" + i);
+          if (el) el.classList.toggle("active", i === idx);
+        });
+        const labels = ["Minimal Centered", "Day Tag + Time", "Live Heartbeat"];
+        fetch("/set_clock_style", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "value=" + idx,
+        })
+          .then(() => showToast("✓ Clock Face: " + labels[idx], 2000))
+          .catch((e) => console.error("Error setting clock style:", e));
+      }
+
+      function chooseAlarmStyle(idx) {
+        [0, 1, 2].forEach((i) => {
+          const el = document.getElementById("alarm-style-" + i);
+          if (el) el.classList.toggle("active", i === idx);
+        });
+        const labels = ["Strobe Flash", "Bell & Heart", "Wake-Up Marquee"];
+        fetch("/set_alarm_style", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "value=" + idx,
+        })
+          .then(() => showToast("✓ Alarm Style: " + labels[idx], 2000))
+          .catch((e) => console.error("Error setting alarm style:", e));
+      }
+
+      function setShowDateMode(show) {
+        const bYes = document.getElementById("btn-showdate-yes");
+        const bNo = document.getElementById("btn-showdate-no");
+        if (bYes) bYes.classList.toggle("active", show);
+        if (bNo) bNo.classList.toggle("active", !show);
+        const legacyEl = document.getElementById("showDate");
+        if (legacyEl) legacyEl.checked = show;
+        fetch("/set_showdate", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "value=" + (show ? "1" : "0"),
+        })
+          .then(() => showToast(show ? "✓ Date display enabled" : "✓ Clock Time Only (Date hidden)", 2000))
+          .catch((e) => console.error("Error setting showdate:", e));
+      }
+
+      let _mobileBrightDebounce = null;
+      function updateMobileBrightness(val) {
+        val = parseInt(val, 10);
+        const mVal = document.getElementById("mobile-bright-val");
+        if (mVal) mVal.textContent = val + " / 15";
+        const mSlider = document.getElementById("mobile-bright-slider");
+        if (mSlider) mSlider.value = val;
+        const legacySlider = document.getElementById("brightnessSlider");
+        if (legacySlider) {
+          legacySlider.value = val;
+          const legacyVal = document.getElementById("brightnessValue");
+          if (legacyVal) legacyVal.textContent = val;
+        }
+        clearTimeout(_mobileBrightDebounce);
+        _mobileBrightDebounce = setTimeout(() => {
+          fetch("/set_brightness", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: "value=" + val,
+          })
+            .then(() => showToast("✓ Brightness: " + val, 1500))
+            .catch((e) => console.error("Error setting brightness:", e));
+        }, 150);
+      }
+
+      function setBrightnessPreset(val) {
+        updateMobileBrightness(val);
+      }
+
+      function testAlarmNow() {
+        showToast("🔔 Testing Alarm on Clock... (10s)", 3000);
+        fetch("/test_alarm", { method: "POST" })
+          .then(() => showToast("✓ Alarm preview triggered!", 2500))
+          .catch((e) => {
+            console.error("Error testing alarm:", e);
+            showToast("⚠️ Could not trigger alarm test", 2500);
+          });
       }
 
       // Initialize the checkbox from cfg and wire up immediate save (no reboot)
