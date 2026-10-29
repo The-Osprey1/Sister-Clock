@@ -2455,7 +2455,7 @@ void setupWebServer() {
     if (request->hasParam("value", true)) {
       value = request->getParam("value", true)->value();
     } else if (request->params() > 0) {
-      value = request->getParam(0)->value();
+      value = request->getParam((size_t)0)->value();
     }
     executeAction(action, value);
     request->send(200, "application/json", "{\"ok\":true}");
@@ -2510,7 +2510,7 @@ void setupWebServer() {
       if (request->hasParam("value", true)) {
         value = request->getParam("value", true)->value();
       } else if (request->params() > 0) {
-        value = request->getParam(0)->value();
+        value = request->getParam((size_t)0)->value();
       }
       sisterAffirmations = (value == "1" || value == "true" || value == "on");
       hideDonationMsg = !sisterAffirmations;
@@ -2532,7 +2532,7 @@ void setupWebServer() {
       if (request->hasParam("value", true)) {
         value = request->getParam("value", true)->value();
       } else if (request->params() > 0) {
-        value = request->getParam(0)->value();
+        value = request->getParam((size_t)0)->value();
       }
       hideDonationMsg = (value == "1" || value == "true" || value == "on");
       sisterAffirmations = !hideDonationMsg;
@@ -2993,7 +2993,7 @@ void setupWebServer() {
       } else {
         // Handle other actions (brightness, etc.)
         if (request->params() > 0) {
-          executeAction(request->getParam(0)->name(), request->getParam(0)->value());
+          executeAction(request->getParam((size_t)0)->name(), request->getParam((size_t)0)->value());
           request->send(200, "text/plain", "OK");
         } else {
           request->send(400, "text/plain", "No parameters found");

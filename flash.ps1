@@ -51,8 +51,8 @@ if ([string]::IsNullOrWhiteSpace($Port)) {
         Write-Host "[OK] Automatically detected: $Port" -ForegroundColor Green
     } else {
         Write-Host "Multiple COM ports detected: $($availablePorts -join ', ')" -ForegroundColor Yellow
-        $Port = $availablePorts[0]
-        Write-Host "Defaulting to: $Port (use -Port COMx to specify another)" -ForegroundColor Cyan
+        Write-Host "Specify the clock's port with -Port COMx before flashing." -ForegroundColor Yellow
+        exit 1
     }
 } else {
     Write-Host "Using specified port: $Port" -ForegroundColor Cyan
@@ -62,6 +62,7 @@ if ([string]::IsNullOrWhiteSpace($Port)) {
 Write-Host "Checking esptool..." -ForegroundColor Cyan
 try {
     $ver = python -m esptool version 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "esptool is not available" }
     Write-Host "[OK] $ver" -ForegroundColor Green
 } catch {
     Write-Host "[ERROR] esptool is not installed in Python!" -ForegroundColor Red

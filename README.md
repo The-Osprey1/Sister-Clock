@@ -73,6 +73,8 @@ pio run -t upload
 
 ---
 
+For a short, sister-friendly walkthrough, see the [SisterClock Quick Guide](SISTER_QUICK_GUIDE.md).
+
 ## 📶 First-Time Wi-Fi Setup
 
 1. **Power on SisterClock:** On first boot, the display shows a pulsing heart `<3` indicating setup mode.

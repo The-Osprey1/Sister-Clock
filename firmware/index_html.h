@@ -34,6 +34,14 @@ const char index_html[] PROGMEM = R"rawliteral(
     <meta http-equiv="Expires" content="0" />
     <title>SisterClock ✨ Settings</title>
     <style>
+      .alarm-presets { display: flex; flex-wrap: wrap; gap: .5rem; margin: .5rem 0; }
+      .alarm-presets button { min-height: 44px; padding: .5rem .8rem; cursor: pointer; }
+      .everyday-nav { margin: 1.5rem 0; }
+      .everyday-nav a, .everyday-nav button { display: block; width: 100%; box-sizing: border-box; margin: .5rem 0; padding: .8rem; min-height: 44px; color: white; background: #303747; border: 1px solid #78859c; border-radius: 8px; text-align: left; font: inherit; text-decoration: none; cursor: pointer; }
+      :focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+      #scan-status { color: #e2e8f0; }
+      .ssid-option { width: 100%; text-align: left; min-height: 44px; }
+      @media (max-width: 600px) { input, select, textarea { font-size: 16px !important; } }
       *,
       *::before,
       *::after {
@@ -1669,13 +1677,14 @@ const char index_html[] PROGMEM = R"rawliteral(
           </div>
         </div>
       </div>
-      <h2 class="no-st">Wi-Fi Settings</h2>
+      <h2 class="no-st">Connect your clock to Wi-Fi</h2>
+      <p class="no-st">Choose your home Wi-Fi, enter its password, then tap Connect clock. Use a 2.4 GHz network.</p>
       <div id="move-wifi">
-        <label for="ssid">Enter Wi-Fi network or click Scan</label>
+        <label for="ssid">Home Wi-Fi name</label>
         <div class="ssid-wrapper">
           <div class="combo-container">
             <input type="text" id="ssid" name="ssid" required />
-            <button type="button" id="arrowBtn" title="Show scanned" disabled>
+            <button type="button" id="arrowBtn" title="Show networks" aria-label="Show networks" disabled>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -1698,14 +1707,15 @@ const char index_html[] PROGMEM = R"rawliteral(
               </svg>
             </button>
             <button type="button" class="primary-button" id="scanBtn">
-              Scan
+              Find Wi-Fi
             </button>
           </div>
           <div id="ssidList"></div>
+          <p id="scan-status" role="status" aria-live="polite"></p>
         </div>
         <label for="password">Enter your Wi-Fi password</label>
         <div class="password-field-wrapper">
-          <input type="password" id="password" name="password" />
+          <input type="password" id="password" name="password" autocomplete="current-password" />
           <label class="small">
             <input
               type="checkbox"
@@ -1717,6 +1727,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         </div>
       </div>
 
+      <div id="setup-timezone" class="no-st"><label for="timeZone">Your time zone</label><p class="small">Check that this matches where you live before connecting.</p></div>
       <div id="move-time-language">
         <div class="language-row">
           <div>
@@ -1761,40 +1772,46 @@ const char index_html[] PROGMEM = R"rawliteral(
           </select>
         </div>
       </div>
-      <div class="mobile-hero-card" id="sister-customizer">
-        <h2>✨ Sister's Clock Customizer</h2>
-        <div class="mobile-hero-subtitle">Personalize your clock display, alarms, and glow with a tap</div>
+      <nav class="no-ap everyday-nav" aria-label="Everyday controls">
+        <h2>Your clock</h2><p>What would you like to do?</p>
+        <a href="#sister-customizer">Adjust brightness and appearance</a>
+        <button type="button" onclick="openAlarmSettings()">Set an alarm</button>
+        <a href="#quickactions">Send a message or use a timer</a>
+      </nav>
+      <div class="mobile-hero-card no-ap" id="sister-customizer">
+        <h2>✨ Make your clock yours</h2>
+        <div class="mobile-hero-subtitle">Changes here are saved as you make them.</div>
 
-        <!-- 1. 12-Hour vs 24-Hour (Military) Time -->
+        <!-- 1. 12-Hour vs 24-Hour Time -->
         <div class="customizer-section">
           <div class="customizer-section-title">⏰ Time Format</div>
           <div class="customizer-section-desc">Choose between standard 12-hour or 24-hour military time.</div>
           <div class="toggle-group">
             <button type="button" class="toggle-btn" id="btn-12h" onclick="setTwelveHourMode(true)">☀️ 12-Hour (AM/PM)</button>
-            <button type="button" class="toggle-btn" id="btn-24h" onclick="setTwelveHourMode(false)">🌙 24-Hour (Military)</button>
+            <button type="button" class="toggle-btn" id="btn-24h" onclick="setTwelveHourMode(false)">🌙 24-Hour</button>
           </div>
         </div>
 
         <!-- 2. Clock Display Face Styles (3 Looks) -->
         <div class="customizer-section">
           <div class="customizer-section-title">🎨 Clock Display Look</div>
-          <div class="customizer-section-desc">Select how the clock time is shown on the LED matrix.</div>
+          <div class="customizer-section-desc">Select how the clock time is shown on the clock.</div>
           <div class="style-cards-grid" id="clock-style-grid">
-            <div class="style-card" id="clock-style-0" onclick="chooseClockStyle(0)">
+            <button type="button" class="style-card" id="clock-style-0" onclick="chooseClockStyle(0)" aria-pressed="false">
               <div class="style-card-badge">10:42</div>
               <div class="style-card-title">Minimal</div>
               <div class="style-card-desc">Clean & steady</div>
-            </div>
-            <div class="style-card" id="clock-style-1" onclick="chooseClockStyle(1)">
+            </button>
+            <button type="button" class="style-card" id="clock-style-1" onclick="chooseClockStyle(1)" aria-pressed="false">
               <div class="style-card-badge">MON 10:42</div>
               <div class="style-card-title">Day Tag</div>
               <div class="style-card-desc">With weekday</div>
-            </div>
-            <div class="style-card" id="clock-style-2" onclick="chooseClockStyle(2)">
+            </button>
+            <button type="button" class="style-card" id="clock-style-2" onclick="chooseClockStyle(2)" aria-pressed="false">
               <div class="style-card-badge">10:42 ♥</div>
               <div class="style-card-title">Heartbeat</div>
               <div class="style-card-desc">Pulsing colon</div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -1813,7 +1830,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="customizer-section-title">💡 Brightness & Glow</div>
           <div class="customizer-section-desc">Slide or tap a preset to adjust LED brightness instantly.</div>
           <div class="bright-slider-row">
-            <input type="range" id="mobile-bright-slider" min="0" max="15" value="10" oninput="updateMobileBrightness(this.value)">
+            <input type="range" id="mobile-bright-slider" aria-label="Clock brightness" min="0" max="15" value="10" oninput="updateMobileBrightness(this.value)">
             <span class="bright-val-pill" id="mobile-bright-val">10 / 15</span>
           </div>
           <div class="preset-pills-row">
@@ -1829,21 +1846,21 @@ const char index_html[] PROGMEM = R"rawliteral(
           <div class="customizer-section-title">🔔 Alarm Alert Style</div>
           <div class="customizer-section-desc">Choose the animation shown when the alarm rings.</div>
           <div class="style-cards-grid" id="alarm-style-grid">
-            <div class="style-card" id="alarm-style-0" onclick="chooseAlarmStyle(0)">
+            <button type="button" class="style-card" id="alarm-style-0" onclick="chooseAlarmStyle(0)" aria-pressed="false">
               <div class="style-card-badge">🚨 FLASH</div>
               <div class="style-card-title">Strobe Flash</div>
               <div class="style-card-desc">Inverted strobe</div>
-            </div>
-            <div class="style-card" id="alarm-style-1" onclick="chooseAlarmStyle(1)">
+            </button>
+            <button type="button" class="style-card" id="alarm-style-1" onclick="chooseAlarmStyle(1)" aria-pressed="false">
               <div class="style-card-badge">🔔 ♥ 🔔</div>
               <div class="style-card-title">Bell & Heart</div>
               <div class="style-card-desc">Warm & gentle</div>
-            </div>
-            <div class="style-card" id="alarm-style-2" onclick="chooseAlarmStyle(2)">
+            </button>
+            <button type="button" class="style-card" id="alarm-style-2" onclick="chooseAlarmStyle(2)" aria-pressed="false">
               <div class="style-card-badge">WAKE UP!</div>
               <div class="style-card-title">Wake-Up</div>
               <div class="style-card-desc">Text banner</div>
-            </div>
+            </button>
           </div>
           <button type="button" class="sister-action-btn" onclick="testAlarmNow()">🔔 Test Alarm on Clock</button>
         </div>
@@ -2045,8 +2062,7 @@ const char index_html[] PROGMEM = R"rawliteral(
 
       <div class="geo-note">
         <span class="small">
-          Enter your Wi-Fi details and press “Save Settings” to unlock Weather,
-          Custom Messages, and Advanced Features.
+          After connecting, return to this page to customize your clock.
         </span>
       </div>
       <button
@@ -2486,6 +2502,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       <button
         type="button"
         class="sub-collapsible no-ap active"
+        id="alarm-settings"
         aria-expanded="false"
       >
         Alarm
@@ -2501,10 +2518,10 @@ const char index_html[] PROGMEM = R"rawliteral(
               class="primary-button cmsg1 btn-apply-top"
               onclick="saveAlarmConfig()"
             >
-              Apply
+              Save alarms
             </button>
           </div>
-          <p id="alarm-save-status"></p>
+          <p id="alarm-save-status" role="status" aria-live="polite"></p>
         </div>
       </div>
 
@@ -2773,7 +2790,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             </div>
           </div>
           <div class="btn-apply-wrap" id="saveandreboot">
-            <input type="submit" class="primary-button" value="Save & Reboot" />
+            <input type="submit" class="primary-button" value="Save & Reboot" id="connect-clock" />
           </div>
         </div>
       </div>
@@ -2788,7 +2805,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       </div>
 
       <div id="savingMessage"></div>
-      <div id="toast" class="toast"></div>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </form>
 
     <script>
@@ -2850,6 +2867,10 @@ const char index_html[] PROGMEM = R"rawliteral(
           .then((apStatus) => {
             isAPMode = apStatus.isAP;
             if (isAPMode) {
+              document.getElementById("connect-clock").value = "Connect clock";
+              const setupZone = document.getElementById("timeZone");
+              setupZone.classList.remove("no-ap");
+              document.getElementById("setup-timezone").appendChild(setupZone);
               document.querySelector(".geo-note").style.display = "block";
               document
                 .getElementById("geo-button")
@@ -2982,28 +3003,28 @@ const char index_html[] PROGMEM = R"rawliteral(
             const b12 = document.getElementById("btn-12h");
             const b24 = document.getElementById("btn-24h");
             if (b12 && b24) {
-              b12.classList.toggle("active", is12hMode);
-              b24.classList.toggle("active", !is12hMode);
+              b12.classList.toggle("active", is12hMode); b12.setAttribute("aria-pressed", is12hMode);
+              b24.classList.toggle("active", !is12hMode); b24.setAttribute("aria-pressed", !is12hMode);
             }
 
             const cStyle = typeof data.clockStyle !== "undefined" ? data.clockStyle : 0;
             [0, 1, 2].forEach((i) => {
               const el = document.getElementById("clock-style-" + i);
-              if (el) el.classList.toggle("active", i === cStyle);
+              if (el) { el.classList.toggle("active", i === cStyle); el.setAttribute("aria-pressed", i === cStyle); }
             });
 
             const aStyle = typeof data.alarmStyle !== "undefined" ? data.alarmStyle : 0;
             [0, 1, 2].forEach((i) => {
               const el = document.getElementById("alarm-style-" + i);
-              if (el) el.classList.toggle("active", i === aStyle);
+              if (el) { el.classList.toggle("active", i === aStyle); el.setAttribute("aria-pressed", i === aStyle); }
             });
 
             const showDateVal = typeof data.showDate !== "undefined" ? !!data.showDate : true;
             const bDateYes = document.getElementById("btn-showdate-yes");
             const bDateNo = document.getElementById("btn-showdate-no");
             if (bDateYes && bDateNo) {
-              bDateYes.classList.toggle("active", showDateVal);
-              bDateNo.classList.toggle("active", !showDateVal);
+              bDateYes.classList.toggle("active", showDateVal); bDateYes.setAttribute("aria-pressed", showDateVal);
+              bDateNo.classList.toggle("active", !showDateVal); bDateNo.setAttribute("aria-pressed", !showDateVal);
             }
 
             const bVal = typeof data.regularBrightness !== "undefined" ? data.regularBrightness : (typeof data.brightness !== "undefined" ? data.brightness : 10);
@@ -3479,10 +3500,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         if (isAPMode) {
           showSavingModal("");
           updateSavingModal(
-            "<h3>✅ Settings saved successfully!</h3>" +
-              "<p>Rebooting the device now...</p>" +
-              "<p>The device will connect to your Wi-Fi.<br>" +
-              "Its new IP address will appear on the display for future access.</p>",
+            "<h3>Connecting your clock…</h3>" +
+              "<p>Please keep the clock powered on while your settings are sent.</p>",
             true, // show spinner
           );
         } else {
@@ -3518,9 +3537,8 @@ const char index_html[] PROGMEM = R"rawliteral(
                 document.querySelector("html").style.height = "100vh";
                 document.body.style.height = "100vh";
                 updateSavingModal(
-                  "<h3>✅ All done!</h3><p>You can now close this tab safely.</p>" +
-                    "<p>Your device has rebooted and is now connected to your Wi-Fi.<br>" +
-                    "Check the display for the current IP address.</p>",
+                  "<h3>Check your clock</h3><p>The clock is restarting and will try to join your Wi-Fi.</p>" +
+                    "<p>Reconnect your phone to your home Wi-Fi. When an address appears on the clock, enter it in your browser to open this page again. If the clock returns to setup, reconnect to SisterClock-Setup and check your Wi-Fi name and password.</p>",
                   false,
                 );
               }, 5000);
@@ -3587,20 +3605,12 @@ const char index_html[] PROGMEM = R"rawliteral(
               console.warn("Expected disconnect in AP mode after reboot.");
               showSavingModal("");
               updateSavingModal(
-                "<h3>✅ Settings saved successfully!</h3><p>Rebooting the device now...</p>",
+                "<h3>Connection interrupted</h3><p>The clock may be restarting. Check its display for an address. If it returns to setup, reconnect to SisterClock-Setup and try again.</p>",
                 false,
               );
-              setTimeout(() => {
-                document.getElementById("configForm").style.display = "none";
-                updateSavingModal(
-                  "<h3>✅ All done!</h3><p>You can now close this tab safely.</p>" +
-                    "<p>Your device has rebooted and is now connected to your Wi-Fi.<br>" +
-                    "Check the display for the current IP address.</p>",
-                  false,
-                );
-              }, 5000);
               removeReloadButton();
               removeRestoreButton();
+              ensureReloadButton({ text: "Back to setup", onClick: hideSavingModal });
               return;
             }
 
@@ -3628,7 +3638,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             ) {
               ensureRestoreButton();
             } else {
-              ensureReloadButton();
+              ensureReloadButton({ text: "Back to settings", onClick: hideSavingModal });
             }
           });
       }
@@ -3966,8 +3976,8 @@ const char index_html[] PROGMEM = R"rawliteral(
       function setTwelveHourMode(is12h) {
         const b12 = document.getElementById("btn-12h");
         const b24 = document.getElementById("btn-24h");
-        if (b12) b12.classList.toggle("active", is12h);
-        if (b24) b24.classList.toggle("active", !is12h);
+        if (b12) { b12.classList.toggle("active", is12h); b12.setAttribute("aria-pressed", is12h); }
+        if (b24) { b24.classList.toggle("active", !is12h); b24.setAttribute("aria-pressed", !is12h); }
         const legacyEl = document.getElementById("twelveHourToggle");
         if (legacyEl) legacyEl.checked = is12h;
         fetch("/set_twelvehour", {
@@ -3975,14 +3985,14 @@ const char index_html[] PROGMEM = R"rawliteral(
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "value=" + (is12h ? "1" : "0"),
         })
-          .then(() => showToast(is12h ? "✓ 12-Hour (AM/PM) mode active" : "✓ 24-Hour (Military) mode active", 2000))
-          .catch((e) => console.error("Error setting twelvehour:", e));
+          .then((r) => { if (!r.ok) throw new Error("Save failed"); showToast(is12h ? "✓ 12-Hour (AM/PM) mode active" : "✓ 24-Hour mode active", 2000); })
+          .catch((e) => { console.error("Error setting twelvehour:", e); showToast("Could not save. Check your connection, reload this page, and try again.", 6000); });
       }
 
       function chooseClockStyle(idx) {
         [0, 1, 2].forEach((i) => {
           const el = document.getElementById("clock-style-" + i);
-          if (el) el.classList.toggle("active", i === idx);
+          if (el) { el.classList.toggle("active", i === idx); el.setAttribute("aria-pressed", i === idx); }
         });
         const labels = ["Minimal Centered", "Day Tag + Time", "Live Heartbeat"];
         fetch("/set_clock_style", {
@@ -3990,14 +4000,14 @@ const char index_html[] PROGMEM = R"rawliteral(
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "value=" + idx,
         })
-          .then(() => showToast("✓ Clock Face: " + labels[idx], 2000))
-          .catch((e) => console.error("Error setting clock style:", e));
+          .then((r) => { if (!r.ok) throw new Error("Save failed"); showToast("✓ Clock Face: " + labels[idx], 2000); })
+          .catch((e) => { console.error("Error setting clock style:", e); showToast("Could not save. Check your connection, reload this page, and try again.", 6000); });
       }
 
       function chooseAlarmStyle(idx) {
         [0, 1, 2].forEach((i) => {
           const el = document.getElementById("alarm-style-" + i);
-          if (el) el.classList.toggle("active", i === idx);
+          if (el) { el.classList.toggle("active", i === idx); el.setAttribute("aria-pressed", i === idx); }
         });
         const labels = ["Strobe Flash", "Bell & Heart", "Wake-Up Marquee"];
         fetch("/set_alarm_style", {
@@ -4005,15 +4015,15 @@ const char index_html[] PROGMEM = R"rawliteral(
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "value=" + idx,
         })
-          .then(() => showToast("✓ Alarm Style: " + labels[idx], 2000))
-          .catch((e) => console.error("Error setting alarm style:", e));
+          .then((r) => { if (!r.ok) throw new Error("Save failed"); showToast("✓ Alarm Style: " + labels[idx], 2000); })
+          .catch((e) => { console.error("Error setting alarm style:", e); showToast("Could not save. Check your connection, reload this page, and try again.", 6000); });
       }
 
       function setShowDateMode(show) {
         const bYes = document.getElementById("btn-showdate-yes");
         const bNo = document.getElementById("btn-showdate-no");
-        if (bYes) bYes.classList.toggle("active", show);
-        if (bNo) bNo.classList.toggle("active", !show);
+        if (bYes) { bYes.classList.toggle("active", show); bYes.setAttribute("aria-pressed", show); }
+        if (bNo) { bNo.classList.toggle("active", !show); bNo.setAttribute("aria-pressed", !show); }
         const legacyEl = document.getElementById("showDate");
         if (legacyEl) legacyEl.checked = show;
         fetch("/set_showdate", {
@@ -4021,8 +4031,8 @@ const char index_html[] PROGMEM = R"rawliteral(
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "value=" + (show ? "1" : "0"),
         })
-          .then(() => showToast(show ? "✓ Date display enabled" : "✓ Clock Time Only (Date hidden)", 2000))
-          .catch((e) => console.error("Error setting showdate:", e));
+          .then((r) => { if (!r.ok) throw new Error("Save failed"); showToast(show ? "✓ Date display enabled" : "✓ Clock Time Only (Date hidden)", 2000); })
+          .catch((e) => { console.error("Error setting showdate:", e); showToast("Could not save. Check your connection, reload this page, and try again.", 6000); });
       }
 
       let _mobileBrightDebounce = null;
@@ -4045,8 +4055,8 @@ const char index_html[] PROGMEM = R"rawliteral(
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: "value=" + val,
           })
-            .then(() => showToast("✓ Brightness: " + val, 1500))
-            .catch((e) => console.error("Error setting brightness:", e));
+            .then((r) => { if (!r.ok) throw new Error("Save failed"); showToast("✓ Brightness: " + val, 1500); })
+            .catch((e) => { console.error("Error setting brightness:", e); showToast("Could not save. Check your connection, reload this page, and try again.", 6000); });
         }, 150);
       }
 
@@ -4057,7 +4067,7 @@ const char index_html[] PROGMEM = R"rawliteral(
       function testAlarmNow() {
         showToast("🔔 Testing Alarm on Clock... (10s)", 3000);
         fetch("/test_alarm", { method: "POST" })
-          .then(() => showToast("✓ Alarm preview triggered!", 2500))
+          .then((r) => { if (!r.ok) throw new Error("Alarm test failed"); showToast("✓ Alarm preview triggered!", 2500); })
           .catch((e) => {
             console.error("Error testing alarm:", e);
             showToast("⚠️ Could not trigger alarm test", 2500);
@@ -4576,6 +4586,7 @@ window.addEventListener("load", handleGeoRedirectResult);
         arrowBtn.disabled = true;
         scanBtn.disabled = true;
         list.style.display = "none";
+        document.getElementById("scan-status").textContent = "Looking for Wi-Fi networks…";
 
         // 2. Start Continuous Dot Animation
         let dotCount = 0;
@@ -4585,40 +4596,53 @@ window.addEventListener("load", handleGeoRedirectResult);
         }, 850);
 
         // 3. Define the recursive Polling Function
-        const performPolling = async () => {
+        const performPolling = async (attempt = 0) => {
           try {
-            const resp = await fetch("/scan");
-
-            if (resp.status === 202) {
-              // ESP is still busy. Wait 1 second then try again.
-              await new Promise((resolve) => setTimeout(resolve, 1000));
-              return await performPolling();
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 5000);
+            let resp;
+            try {
+              resp = await fetch("/scan", { signal: controller.signal });
+            } finally {
+              clearTimeout(timeout);
             }
 
+            if (resp.status === 202) {
+              // Stop waiting after 20 seconds and allow a retry.
+              if (attempt >= 20) throw new Error("Scan timed out");
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+              return await performPolling(attempt + 1);
+            }
+
+            if (!resp.ok) throw new Error("Scan failed");
             if (resp.status === 200) {
               const networks = await resp.json();
               list.innerHTML = "";
 
               if (networks && networks.length > 0) {
                 networks.forEach((net) => {
-                  const div = document.createElement("div");
+                  const div = document.createElement("button");
+                  div.type = "button";
                   div.className = "ssid-option";
                   div.innerText = net.ssid;
                   div.onclick = () => {
                     ssidInput.value = net.ssid;
                     list.style.display = "none";
+                    document.getElementById("scan-status").textContent = "Wi-Fi selected. Enter its password below.";
+                    document.getElementById("password").focus();
                   };
                   list.appendChild(div);
                 });
                 enableDropdown();
                 list.style.display = "block";
+                document.getElementById("scan-status").textContent = "Choose your home Wi-Fi from the list.";
               } else {
-                alert("No networks found.");
+                document.getElementById("scan-status").textContent = "No networks found. Try again, or type your Wi-Fi name above.";
               }
             }
           } catch (err) {
             console.error("Scan error:", err);
-            alert("Device connection lost.");
+            document.getElementById("scan-status").textContent = "Could not find networks. Check that your phone is connected to the clock and try again, or type your Wi-Fi name.";
           }
         };
 
@@ -4628,7 +4652,7 @@ window.addEventListener("load", handleGeoRedirectResult);
         // 5. Final Cleanup (Runs only AFTER polling is completely finished)
         clearInterval(dotInterval);
         scanBtn.disabled = false;
-        scanBtn.innerText = "Scan";
+        scanBtn.innerText = "Find Wi-Fi";
       };
 
       function uploadOtaFile() {
@@ -5196,11 +5220,18 @@ function _alarmSoundOpts(selected) {
           }
         }
       }
+      const alarmContainer = document.getElementById("alarm-config-container");
+      function markAlarmUnsaved() {
+        document.getElementById("alarm-save-status").textContent = "Changes not saved yet. Tap Save alarms.";
+      }
+      alarmContainer.addEventListener("input", markAlarmUnsaved);
+      alarmContainer.addEventListener("change", markAlarmUnsaved);
+
       let _alarmData = null;
       let _alarmExpanded = [true, false, false, false];
 
       function _alarmScheduleText(a) {
-        if (!a.enabled) return "NO ALARM SET";
+        if (!a.enabled) return "Alarm is off";
         const timeVal =
           String(a.hour).padStart(2, "0") +
           ":" +
@@ -5208,9 +5239,11 @@ function _alarmSoundOpts(selected) {
         const dayLabels = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
         const selected = [];
         for (let i = 0; i < 7; i++) if (a.days[i]) selected.push(dayLabels[i]);
-        if (selected.length === 0) return `ALARM ${timeVal} (NO DAYS SELECTED)`;
-        if (selected.length === 7) return `ALARM ${timeVal} EVERY DAY`;
-        return `ALARM ${timeVal} ${selected.join(" ")}`;
+        if (selected.length === 0) return "Choose at least one day";
+        if (selected.length === 7) return `Every day at ${timeVal}`;
+        if (selected.join(" ") === "MON TUE WED THU FRI") return `Weekdays at ${timeVal}`;
+        if (selected.join(" ") === "SUN SAT") return `Weekends at ${timeVal}`;
+        return `${selected.join(", ")} at ${timeVal}`;
       }
 
       function _renderAlarmConfig() {
@@ -5256,6 +5289,12 @@ function _alarmSoundOpts(selected) {
         <input type="time" id="alarm${i}_time" value="${String(a.hour).padStart(2, "0")}:${String(a.minute).padStart(2, "0")}" oninput="_updateAlarmPreview(${i})" />
 
         <label>Repeat:</label>
+        <div class="alarm-presets" id="alarm${i}_presets" aria-label="Choose repeat days">
+          <button type="button" onclick="setAlarmDays(${i}, 'every')">Every day</button>
+          <button type="button" onclick="setAlarmDays(${i}, 'weekdays')">Weekdays</button>
+          <button type="button" onclick="setAlarmDays(${i}, 'weekends')">Weekends</button>
+        </div>
+        <p class="small">Or choose individual days below.</p>
         <div class="alarm-days-row" id="alarm${i}_daysRow">
           ${["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
             .map(
@@ -5291,6 +5330,16 @@ function _alarmSoundOpts(selected) {
           if (_alarmExpanded[i])
             setAlarmFieldsEnabled(i, _alarmData.alarms[i].enabled);
         }
+      }
+
+      function setAlarmDays(i, preset) {
+        for (let d = 0; d < 7; d++) {
+          const cb = document.getElementById(`alarm${i}_day${d}`);
+          if (!cb || cb.disabled) continue;
+          cb.checked = preset === "every" || (preset === "weekdays" ? d > 0 && d < 6 : d === 0 || d === 6);
+          cb.closest(".day-pill").classList.toggle("checked", cb.checked);
+        }
+        _updateAlarmPreview(i);
       }
 
       function _expandAlarm(i) {
@@ -5357,6 +5406,8 @@ function _alarmSoundOpts(selected) {
       }
 
       function _updateAlarmPreview(i) {
+        const status = document.getElementById("alarm-save-status");
+        if (status) status.textContent = "Changes not saved yet. Tap Save alarms.";
         const enabledEl = document.getElementById(`alarm${i}_enabled`);
         const timeEl = document.getElementById(`alarm${i}_time`);
         if (!enabledEl || !timeEl) return;
@@ -5369,11 +5420,13 @@ function _alarmSoundOpts(selected) {
           if (cb && cb.checked) selected.push(dayLabels[d]);
         }
         let text;
-        if (!enabled) text = "NO ALARM SET";
+        if (!enabled) text = "Alarm is off";
         else if (selected.length === 0)
-          text = `ALARM ${timeVal} (NO DAYS SELECTED)`;
-        else if (selected.length === 7) text = `ALARM ${timeVal} EVERY DAY`;
-        else text = `ALARM ${timeVal} ${selected.join(" ")}`;
+          text = "Choose at least one day";
+        else if (selected.length === 7) text = `Every day at ${timeVal}`;
+        else if (selected.join(" ") === "MON TUE WED THU FRI") text = `Weekdays at ${timeVal}`;
+        else if (selected.join(" ") === "SUN SAT") text = `Weekends at ${timeVal}`;
+        else text = `${selected.join(", ")} at ${timeVal}`;
         document.getElementById(`alarm${i}_previewText`).textContent = text;
         setAlarmFieldsEnabled(i, enabled);
       }
@@ -5395,6 +5448,8 @@ function _alarmSoundOpts(selected) {
             cb.closest(".day-pill").classList.toggle("disabled", !enabled);
           }
         }
+        const presets = document.getElementById(`alarm${i}_presets`);
+        if (presets) presets.querySelectorAll("button").forEach((button) => { button.disabled = !enabled; });
         const testBtn = document.getElementById(`alarm${i}_testBtn`);
         if (testBtn) {
           testBtn.disabled = !enabled;
@@ -5472,6 +5527,14 @@ function _alarmSoundOpts(selected) {
 
         _syncAlarmData();
         const statusEl = document.getElementById("alarm-save-status");
+        for (let i = 0; i < _alarmData.alarms.length; i++) {
+          const a = _alarmData.alarms[i];
+          if (a.enabled && !a.days.some(Boolean)) {
+            statusEl.textContent = `Choose at least one day for alarm ${i + 1}, then save again.`;
+            document.getElementById(`alarm${i}_day0`).focus();
+            return;
+          }
+        }
         const params = new URLSearchParams();
 
         for (let i = 0; i < 4; i++) {
@@ -5493,13 +5556,11 @@ function _alarmSoundOpts(selected) {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body: params,
           });
-          if (showStatus)
-            showToast(
-              res.ok ? "✓ Settings applied" : "⚠️ \u00A0\u00A0Save failed.",
-              res.ok ? 3000 : 5000,
-            );
+          if (showStatus) {
+            statusEl.textContent = res.ok ? "Alarms saved." : "Could not save alarms. Check your connection and try again.";
+          }
         } catch {
-          if (showStatus) showToast("⚠️ \u00A0\u00A0Save failed.", 5000);
+          if (showStatus) statusEl.textContent = "Could not reach your clock. Check your connection and try again.";
         }
       }
 
@@ -5759,8 +5820,15 @@ function _alarmSoundOpts(selected) {
         }
       }
 
+      function openAlarmSettings() {
+        const button = document.getElementById("alarm-settings");
+        if (button.getAttribute("aria-expanded") !== "true") button.click();
+        button.scrollIntoView({ block: "start" });
+        button.focus();
+      }
+
       function quickAction(action, value = "") {
-        fetch(`http://${deviceIP}/action`, {
+        fetch(`/action`, {
           method: "POST",
           headers: {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -5769,8 +5837,12 @@ function _alarmSoundOpts(selected) {
           body: new URLSearchParams({
             [action]: value,
           }),
+        }).then((response) => {
+          if (!response.ok) throw new Error("Action failed");
+          showToast("Sent to your clock.");
         }).catch((e) => {
           console.error("Quick action failed:", e);
+          showToast("Could not reach your clock. Check your connection and try again.", 6000);
         });
       }
 

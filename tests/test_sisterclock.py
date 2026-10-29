@@ -191,14 +191,14 @@ def test_mobile_customizer_ui_elements():
 
     # Hero card header
     assert 'id="sister-customizer"' in content
-    assert "Sister's Clock Customizer" in content
+    assert "Make your clock yours" in content
     assert "mobile-hero-card" in content
 
     # 12h vs 24h controls
     assert 'id="btn-12h"' in content
     assert 'id="btn-24h"' in content
     assert "12-Hour (AM/PM)" in content
-    assert "24-Hour (Military)" in content
+    assert "24-Hour" in content
 
     # 3 Clock face looks
     assert 'id="clock-style-0"' in content
