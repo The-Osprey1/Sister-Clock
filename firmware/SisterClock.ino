@@ -409,10 +409,13 @@ unsigned long pomodoroLongBreakMs = 15 * 60000UL;  // default 15 min
 int global_scrolltimes = 0;  // Persisted from HTTP request
 int global_msgSeconds = 0;
 
-// --- Donation / Encouragement Message ---
-bool hideDonationMsg = false;    // true = user opted out (or is an existing customer)
-bool donationFirstBoot = false;  // true only on a fresh install (no prior config.json)
-time_t nextDonationTime = 0;     // Unix timestamp for next scheduled message
+// --- Sister Affirmation System ---
+bool sisterAffirmations = true;       // true = enabled (default: ON for SisterClock)
+bool hideDonationMsg = false;         // legacy alias: false = enabled
+bool affirmationFirstBoot = true;     // true on fresh install
+time_t nextAffirmationTime = 0;       // Unix timestamp for next scheduled affirmation
+#define nextDonationTime nextAffirmationTime
+
 
 // --- Configurable Buttons (3x, stored in config.json) ---
 struct BtnCfg {
@@ -525,11 +528,13 @@ void loadConfig() {
     countdownObj["label"] = "";
     countdownObj["isDramaticCountdown"] = true;
 
-    // Fresh install: donation messages enabled, schedule for next day
+    // Fresh install: sister affirmations enabled by default
+    doc[F("sisterAffirmations")] = true;
     doc[F("hideDonationMsg")] = false;
+    doc[F("nextAffirmationTime")] = 0;
     doc[F("nextDonationTime")] = 0;
-    donationFirstBoot = true;
-    Serial.println(F("[DONATION] Fresh install — messages enabled, will schedule for day 2."));
+    affirmationFirstBoot = true;
+    Serial.println(F("[AFFIRMATION] Fresh install — Sister affirmations enabled."));
 
     File f = LittleFS.open("/config.json", "w");
     if (f) {
@@ -688,18 +693,22 @@ void loadConfig() {
     Serial.println(F("[CONFIG] Migrated: added clockOnlyDuringDimming default."));
   }
 
-  // --- DONATION MESSAGE LOADING / MIGRATION ---
-  if (doc.containsKey("hideDonationMsg")) {
-    hideDonationMsg = doc["hideDonationMsg"].as<bool>();
-    nextDonationTime = (time_t)(doc["nextDonationTime"] | 0);
+  // --- SISTER AFFIRMATIONS LOADING / MIGRATION ---
+  if (doc.containsKey("sisterAffirmations")) {
+    sisterAffirmations = doc["sisterAffirmations"].as<bool>();
+  } else if (doc.containsKey("hideDonationMsg")) {
+    sisterAffirmations = !doc["hideDonationMsg"].as<bool>();
   } else {
-    // Existing customer upgrading — silence donation messages silently
-    hideDonationMsg = true;
-    nextDonationTime = 0;
-    doc["hideDonationMsg"] = true;
-    doc["nextDonationTime"] = 0;
+    sisterAffirmations = true;
+    doc["sisterAffirmations"] = true;
     configChanged = true;
-    Serial.println(F("[CONFIG] Migrated: existing user detected, hideDonationMsg set to true."));
+    Serial.println(F("[CONFIG] Default sisterAffirmations set to true."));
+  }
+  hideDonationMsg = !sisterAffirmations;
+  if (doc.containsKey("nextAffirmationTime")) {
+    nextAffirmationTime = (time_t)(doc["nextAffirmationTime"] | 0);
+  } else {
+    nextAffirmationTime = (time_t)(doc["nextDonationTime"] | 0);
   }
 
   // --- BUZZER CONFIG LOADING / MIGRATION ---
@@ -1187,14 +1196,14 @@ void printConfigToSerial() {
   Serial.println(isDramaticCountdown ? "Yes" : "No");
   Serial.print(F("Custom Message: "));
   Serial.println(customMessage);
-  Serial.print(F("Donation Messages: "));
-  Serial.println(hideDonationMsg ? "Hidden (user opted out)" : "Enabled");
-  Serial.print(F("Next Donation Message: "));
-  if (hideDonationMsg || nextDonationTime == 0) {
+  Serial.print(F("Sister Affirmations: "));
+  Serial.println(sisterAffirmations ? "Enabled" : "Disabled");
+  Serial.print(F("Next Sister Affirmation: "));
+  if (!sisterAffirmations || nextAffirmationTime == 0) {
     Serial.println(F("N/A"));
   } else {
     struct tm t;
-    localtime_r(&nextDonationTime, &t);
+    localtime_r(&nextAffirmationTime, &t);
     char buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &t);
     Serial.println(buf);
@@ -1264,6 +1273,54 @@ void utf8ToLatin1(String &s) {
       out += '\'';
       i++;
       continue;
+    }
+
+    // Heart emojis: ❤️ (E2 9D A4 [EF B8 8F]) or ❤ (E2 9D A4)
+    if (b1 == 0xE2 && i + 2 < (int)s.length() && (uint8_t)s[i + 1] == 0x9D && (uint8_t)s[i + 2] == 0xA4) {
+      out += (char)0x8F;
+      i += 2;
+      if (i + 3 < (int)s.length() && (uint8_t)s[i + 1] == 0xEF && (uint8_t)s[i + 2] == 0xB8 && (uint8_t)s[i + 3] == 0x8F) {
+        i += 3;
+      }
+      continue;
+    }
+
+    // Sparkles emoji: ✨ (E2 9C A8)
+    if (b1 == 0xE2 && i + 2 < (int)s.length() && (uint8_t)s[i + 1] == 0x9C && (uint8_t)s[i + 2] == 0xA8) {
+      out += (char)0xD2;
+      i += 2;
+      continue;
+    }
+
+    // Star emoji: ⭐ (E2 AD 90)
+    if (b1 == 0xE2 && i + 2 < (int)s.length() && (uint8_t)s[i + 1] == 0xAD && (uint8_t)s[i + 2] == 0x90) {
+      out += (char)0xD1;
+      i += 2;
+      continue;
+    }
+
+    // 4-byte emojis (starts with F0 9F)
+    if (b1 == 0xF0 && i + 3 < (int)s.length() && (uint8_t)s[i + 1] == 0x9F) {
+      uint8_t b3 = (uint8_t)s[i + 2];
+      uint8_t b4 = (uint8_t)s[i + 3];
+      // Glowing star 🌟 (F0 9F 8C 9F)
+      if (b3 == 0x8C && b4 == 0x9F) {
+        out += (char)0xD1;
+        i += 3;
+        continue;
+      }
+      // Smiling emojis 😊, 😀, 😃, 😄, 🙂
+      if ((b3 == 0x98 && (b4 == 0x8A || b4 == 0x80 || b4 == 0x83 || b4 == 0x81)) || (b3 == 0x99 && b4 == 0x82)) {
+        out += (char)0xD0;
+        i += 3;
+        continue;
+      }
+      // Heart emojis: 💕 (F0 9F 92 95), 💖 (F0 9F 92 96), 💗 (F0 9F 92 97)
+      if (b3 == 0x92 && (b4 == 0x95 || b4 == 0x96 || b4 == 0x97 || b4 == 0x93 || b4 == 0x98)) {
+        out += (char)0x8F;
+        i += 3;
+        continue;
+      }
     }
 
     if (b1 == 0xC2 && i + 1 < (int)s.length()) {
@@ -1355,8 +1412,11 @@ void replaceIconTokens(String &msg, int &totalPixelWidth) {
     { "[HEART]", "\x8F", 7 },
     { "[LOVE]", "\x8F", 7 },
     { "<3", "\x8F", 7 },
-    { "[STAR]", "\x0F", 8 },
-    { "[SMILE]", "\x02", 8 },
+    { "[STAR]", "\xD1", 7 },
+    { "[SPARKLE]", "\xD2", 5 },
+    { "[SMILE]", "\xD0", 7 },
+    { ":)", "\xD0", 7 },
+    { ":-)", "\xD0", 7 },
     { "[CHECK]", "\x90", 5 },
     { "[INSTA]", "\x9B", 8 },
     { "[TV]", "\x9C", 11 },
@@ -1901,19 +1961,22 @@ static String statusSectionJson(int section, SnsType snsType, time_t nowTime) {
     case 9:
       {
         JsonDocument doc;
+        doc["sisterAffirmations"] = sisterAffirmations;
         doc["hideDonationMsg"] = hideDonationMsg;
-        if (!hideDonationMsg && nextDonationTime > 0) {
+        if (sisterAffirmations && nextAffirmationTime > 0) {
           struct tm t;
-          localtime_r(&nextDonationTime, &t);
+          localtime_r(&nextAffirmationTime, &t);
           char buf[32];
           strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M", &t);
+          doc["nextAffirmationTime"] = String(buf);
           doc["nextDonationTime"] = String(buf);
         } else {
+          doc["nextAffirmationTime"] = "N/A";
           doc["nextDonationTime"] = "N/A";
         }
         String json;
         serializeJson(doc, json);
-        return ",\"donations\":" + json;
+        return ",\"affirmations\":" + json + ",\"donations\":" + json;
       }
     case 10:
       {
@@ -2417,6 +2480,28 @@ void setupWebServer() {
       handleCustomMessageLogic(request);
     });
 
+    server.on("/set_sister_affirmations", HTTP_POST, [](AsyncWebServerRequest *request) {
+      String value = "";
+      if (request->hasParam("value", true)) {
+        value = request->getParam("value", true)->value();
+      } else if (request->params() > 0) {
+        value = request->getParam(0)->value();
+      }
+      sisterAffirmations = (value == "1" || value == "true" || value == "on");
+      hideDonationMsg = !sisterAffirmations;
+      if (sisterAffirmations && nextAffirmationTime == 0 && ntpSyncSuccessful) {
+        nextAffirmationTime = calcNextAffirmationTime(true);
+      }
+      saveConfigRuntime();
+      Serial.printf(PSTR("[AFFIRMATION] sisterAffirmations set to %s\n"), sisterAffirmations ? "true" : "false");
+      request->send(200, "application/json", "{\"ok\":true}");
+    });
+
+    server.on("/send_affirmation", HTTP_ANY, [](AsyncWebServerRequest *request) {
+      triggerSisterAffirmation();
+      request->send(200, "application/json", "{\"ok\":true,\"status\":\"Affirmation sent\"}");
+    });
+
     server.on("/set_hide_donation", HTTP_POST, [](AsyncWebServerRequest *request) {
       String value = "";
       if (request->hasParam("value", true)) {
@@ -2425,8 +2510,10 @@ void setupWebServer() {
         value = request->getParam(0)->value();
       }
       hideDonationMsg = (value == "1" || value == "true" || value == "on");
+      sisterAffirmations = !hideDonationMsg;
       saveConfigRuntime();
-      Serial.printf(PSTR("[DONATION] hideDonationMsg set to %s\n"), hideDonationMsg ? "true" : "false");
+      Serial.printf(PSTR("[AFFIRMATION] hideDonationMsg set to %s (sisterAffirmations: %s)\n"),
+                    hideDonationMsg ? "true" : "false", sisterAffirmations ? "true" : "false");
       request->send(200, "application/json", "{\"ok\":true}");
     });
 
@@ -3407,7 +3494,7 @@ void setupWebServer() {
           <p>
             <strong>Next steps:</strong>
             <br>1. Wait about 45 seconds for the reboot to finish.<br>
-            2. Reconnect your PC or phone to the Wi-Fi network: <strong>ESPTimeCast</strong>.<br>
+            2. Reconnect your PC or phone to the Wi-Fi network: <strong>SisterClock-Setup</strong>.<br>
             3. Open your browser and go to <strong>192.168.4.1</strong> to continue setup.
           </p>
         </body>
@@ -4903,6 +4990,9 @@ void executeAction(const String &action, const String &value) {
     rotationEnabled = hasValue ? boolVal : !rotationEnabled;
     if (rotationEnabled && displayMode != 6) advanceDisplayMode();
 
+  } else if (action == "affirmation" || action == "affirm" || action == "sister" || action == "cheer") {
+    triggerSisterAffirmation();
+
   }
 
   // Buzzer actions
@@ -6102,7 +6192,9 @@ bool saveConfigRuntime() {
   doc["dimEndHour"] = dimEndHour;
   doc["dimEndMinute"] = dimEndMinute;
   doc["dimBrightness"] = dimBrightness;
+  doc["sisterAffirmations"] = sisterAffirmations;
   doc["hideDonationMsg"] = hideDonationMsg;
+  doc["nextAffirmationTime"] = (uint32_t)nextAffirmationTime;
   doc["nextDonationTime"] = (uint32_t)nextDonationTime;
 
   doc.remove("buzzer");
@@ -6191,21 +6283,24 @@ String getFormattedDateText(const char *rawText) {
 }
 
 // -----------------------------------------------------------------------------
-// Donation / Encouragement Message Scheduler
+// Sister Affirmation Engine & Message Scheduler
 // -----------------------------------------------------------------------------
-const char *const DONATION_MESSAGES[8] = {
+const char *const SISTER_MESSAGES[10] = {
   "HAVE A WONDERFUL DAY, SIS! \x8F",
-  "YOU MAKE THE WORLD BRIGHTER! *",
+  "YOU MAKE THE WORLD BRIGHTER! \xD1",
   "REMEMBER TO DRINK WATER & SMILE :)",
   "LOVE YOU TO THE MOON & BACK! \x8F",
-  "YOU ARE SMART, STRONG & KIND! *",
+  "YOU ARE SMART, STRONG & KIND! \xD1",
   "YOU\'VE GOT THIS TODAY! <3",
-  "SO PROUD TO BE YOUR BROTHER! \x8F",
-  "SHINE BRIGHT TODAY, SISTER! *"
+  "SO PROUD OF YOU, SIS! \x8F",
+  "SHINE BRIGHT TODAY, SISTER! \xD1",
+  "BEST SISTER IN THE ENTIRE WORLD! \x8F",
+  "SENDING YOU BIG HUGS & LOVE! \xD2"
 };
-const int SISTER_MESSAGE_COUNT = 8;
+const int SISTER_MESSAGE_COUNT = 10;
+const char *const *DONATION_MESSAGES = SISTER_MESSAGES;
 
-time_t calcNextDonationTime(bool forceTomorrow) {
+time_t calcNextAffirmationTime(bool isBoot) {
   time_t now = time(nullptr);
   struct tm local_tm;
   localtime_r(&now, &local_tm);
@@ -6217,27 +6312,42 @@ time_t calcNextDonationTime(bool forceTomorrow) {
   midnight.tm_isdst = -1;
   time_t todayMidnight = mktime(&midnight);
 
-  const int windowStart = 10 * 60;  // 10:00
+  // Waking hours: 09:00 to 21:00 (540 to 1260 minutes from midnight)
+  const int windowStart = 9 * 60;   // 09:00
   const int windowEnd = 21 * 60;    // 21:00
   int curMinOfDay = local_tm.tm_hour * 60 + local_tm.tm_min;
 
-  if (!forceTomorrow && curMinOfDay < windowEnd) {
-    int rangeStart = max(curMinOfDay + 1, windowStart);
-    if (rangeStart < windowEnd) {
-      int chosen = random(rangeStart, windowEnd);
-      Serial.printf(PSTR("[DONATION] Scheduled today at %02d:%02d\n"), chosen / 60, chosen % 60);
-      return todayMidnight + ((time_t)chosen * 60L);
+  if (isBoot) {
+    // If booted during daytime, show first affirmation within 10-25 mins
+    if (curMinOfDay >= windowStart && curMinOfDay < windowEnd - 20) {
+      int nextMin = curMinOfDay + random(10, 25);
+      Serial.printf(PSTR("[AFFIRMATION] First affirmation scheduled today at %02d:%02d\n"), nextMin / 60, nextMin % 60);
+      return todayMidnight + ((time_t)nextMin * 60L);
     }
   }
 
-  time_t tomorrowMidnight = todayMidnight + 86400L;
-  int chosen = random(windowStart, windowEnd);
-  Serial.printf(PSTR("[DONATION] Scheduled tomorrow at %02d:%02d\n"), chosen / 60, chosen % 60);
+  // Next daytime interval: 60-120 mins
+  if (curMinOfDay + 60 < windowEnd && curMinOfDay >= windowStart) {
+    int nextMin = curMinOfDay + random(60, 120);
+    if (nextMin < windowEnd) {
+      Serial.printf(PSTR("[AFFIRMATION] Next scheduled today at %02d:%02d\n"), nextMin / 60, nextMin % 60);
+      return todayMidnight + ((time_t)nextMin * 60L);
+    }
+  }
+
+  // Outside daytime: schedule for tomorrow morning between 09:30 and 10:30
+  time_t tomorrowMidnight = (curMinOfDay >= windowEnd) ? (todayMidnight + 86400L) : todayMidnight;
+  int chosen = random(9 * 60 + 30, 10 * 60 + 30);
+  Serial.printf(PSTR("[AFFIRMATION] Scheduled tomorrow morning at %02d:%02d\n"), chosen / 60, chosen % 60);
   return tomorrowMidnight + ((time_t)chosen * 60L);
 }
 
-void triggerDonationMessage() {
-  if (hideDonationMsg) return;
+time_t calcNextDonationTime(bool forceTomorrow) {
+  return calcNextAffirmationTime(!forceTomorrow);
+}
+
+void triggerSisterAffirmation() {
+  if (!sisterAffirmations) return;
   if (isAPMode) return;
   if (!ntpSyncSuccessful) return;
   if (isNetworkBusy) return;
@@ -6246,7 +6356,7 @@ void triggerDonationMessage() {
   if (!allowInterrupt) return;
 
   int idx = random(0, SISTER_MESSAGE_COUNT);
-  String msg = String(DONATION_MESSAGES[idx]);
+  String msg = String(SISTER_MESSAGES[idx]);
   msg.toCharArray(customMessage, sizeof(customMessage));
 
   messageScrollSpeed = 60;
@@ -6262,10 +6372,14 @@ void triggerDonationMessage() {
   clockScrollDone = false;
   forceMessageRestart = true;
 
-  Serial.printf(PSTR("[DONATION] Showing message %d: %s\n"), idx, DONATION_MESSAGES[idx]);
+  Serial.printf(PSTR("[AFFIRMATION] Showing message %d: %s\n"), idx, SISTER_MESSAGES[idx]);
 
-  nextDonationTime = calcNextDonationTime(true);  // always tomorrow after firing
+  nextAffirmationTime = calcNextAffirmationTime(false);
   saveConfigRuntime();
+}
+
+void triggerDonationMessage() {
+  triggerSisterAffirmation();
 }
 
 void loop() {
@@ -6389,19 +6503,19 @@ void loop() {
     switch (apAnimFrame % 3) {
       case 0:
         {
-          char buf[] = { 3, ' ', (char)169, '\0' };
+          char buf[] = { (char)0x8F, ' ', (char)169, '\0' };
           P.print(buf);
           break;
         }
       case 1:
         {
-          char buf[] = { 3, ' ', (char)170, '\0' };
+          char buf[] = { (char)0x8F, ' ', (char)170, '\0' };
           P.print(buf);
           break;
         }
       case 2:
         {
-          char buf[] = { 3, ' ', (char)171, '\0' };
+          char buf[] = { (char)0x8F, ' ', (char)171, '\0' };
           P.print(buf);
           break;
         }
@@ -6609,11 +6723,12 @@ void loop() {
         setenv("TZ", posixTz, 1);
         tzset();
         tzSetAfterSync = true;
-        // Schedule donation time now that we know the real local time
-        if (!hideDonationMsg && nextDonationTime == 0) {
-          nextDonationTime = calcNextDonationTime(donationFirstBoot);
+        // Schedule affirmation time now that we know the real local time
+        if (sisterAffirmations && nextAffirmationTime == 0) {
+          nextAffirmationTime = calcNextAffirmationTime(affirmationFirstBoot);
+          affirmationFirstBoot = false;
           saveConfigRuntime();
-          Serial.println(F("[DONATION] NTP synced. First donation time scheduled."));
+          Serial.println(F("[AFFIRMATION] NTP synced. First affirmation scheduled."));
         }
       }
       ntpAnimTimer = 0;
@@ -6652,11 +6767,11 @@ void loop() {
     advanceDisplayMode();
   }
 
-  // --- DONATION MESSAGE CHECK ---
-  if (!hideDonationMsg && ntpSyncSuccessful && !isAPMode && nextDonationTime > 0) {
+  // --- SISTER AFFIRMATION CHECK ---
+  if (sisterAffirmations && ntpSyncSuccessful && !isAPMode && nextAffirmationTime > 0) {
     time_t now_d = time(nullptr);
-    if (now_d >= nextDonationTime) {
-      triggerDonationMessage();
+    if (now_d >= nextAffirmationTime) {
+      triggerSisterAffirmation();
     }
   }
 
@@ -6951,7 +7066,7 @@ void loop() {
   }
 
   // keep spacing logic the same ---
-  char timeSpacedStr[24];
+  char timeSpacedStr[64];
   int j = 0;
   for (int i = 0; timeWithSeconds[i] != '\0'; i++) {
     timeSpacedStr[j++] = timeWithSeconds[i];

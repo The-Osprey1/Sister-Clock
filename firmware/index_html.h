@@ -1677,15 +1677,16 @@ const char index_html[] PROGMEM = R"rawliteral(
             placeholder="ENTER MESSAGE"
             title="Allowed: A-Z, 0-9, space, and symbols : ! ' . , _ + % / ? [ ] ° # @ ^ ~ * = < > ( ) { } \ - & $ ¥ |"
           />
-          <div class="small">
-            <strong>Use brackets for special content:</strong> [123] for Big
-            Numbers, icons like [CAR] or [MAIL], [TIMER 5M] for a 5-minute
-            timer. Full icon list
-            <a
-              href="https://github.com/mfactory-osaka/ESPTimeCast#-using-mfactoryfonth-icons-v123"
-              target="_blank"
-              >here</a
-            >.
+          <div class="small" style="margin-top: 6px;">
+            <strong>Special tokens &amp; emojis:</strong> &lt;3 or [LOVE] for ❤️, :) or [SMILE] for 😊, [STAR] for ⭐, [SPARKLE] for ✨, [123] for Big Numbers, [TIMER 5M] for a 5-minute timer.
+          </div>
+          <div style="margin-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken('<3')">&lt;3 ❤️</button>
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken(':)')">:) 😊</button>
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken('[STAR]')">[STAR] ⭐</button>
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken('[SPARKLE]')">[SPARKLE] ✨</button>
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken('[SUNNY]')">[SUNNY] ☀️</button>
+            <button type="button" class="secondary-button" style="padding: 4px 10px; font-size: 0.85rem;" onclick="insertToken('[MUSICNOTE]')">[MUSICNOTE] 🎵</button>
           </div>
         </div>
 
@@ -1704,6 +1705,29 @@ const char index_html[] PROGMEM = R"rawliteral(
           >
             Send Message
           </button>
+        </div>
+
+        <div class="form-group no-ap" style="margin-top: 20px; padding: 16px; background: rgba(244,63,94,0.08); border: 1px solid rgba(244,63,94,0.3); border-radius: 14px;">
+          <label class="toggle-row-lg donation-toggle-row" style="margin-bottom: 6px;">
+            <strong style="color: #fda4af; font-size: 1.1rem;">Sister Affirmations &amp; Cheerful Messages ❤️</strong>
+          </label>
+          <span class="small" style="color: #cbd5e1;">Uplifting love &amp; sweet reminders sent periodically to your sister's display ✨</span>
+          <br>
+          <label class="toggle-row-lg donation-toggle-row" style="margin-top: 12px;">
+            <span class="label-text">Enable Automated Affirmations:</span>
+            <span class="toggle-switch">
+              <input type="checkbox" id="sisterAffirmations" checked>
+              <span class="toggle-slider"></span>
+            </span>
+          </label>
+          <p class="donation-note" style="margin-top: 6px; font-size: 0.85rem; color: #94a3b8;">
+            When enabled, SisterClock surprises her with heartwarming affirmations (e.g. "HAVE A WONDERFUL DAY, SIS! ❤️", "YOU MAKE THE WORLD BRIGHTER! ✨") during waking hours (9am - 9pm).
+          </p>
+          <div style="margin-top: 12px;">
+            <button type="button" class="primary-button cmsg1" style="width: 100%; background: linear-gradient(135deg, #f43f5e, #ec4899); border: none; font-weight: 600;" onclick="sendAffirmationNow()">
+              Surprise Her Now! (Send Random Affirmation ❤️)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2367,7 +2391,7 @@ const char index_html[] PROGMEM = R"rawliteral(
           </div>
           <p id="btn-save-status"></p>
           <div class="btn-gpio-hints">
-            • GPIO pins already used by ESPTimeCast are hidden automatically.<br />
+            • GPIO pins already used by SisterClock are hidden automatically.<br />
             • Buttons should connect the selected GPIO pin to GND when pressed
             (no external resistor required).<br />
             • Select <em>- Disable -</em> if you do not want to use a button.
@@ -2379,47 +2403,29 @@ const char index_html[] PROGMEM = R"rawliteral(
         class="sub-collapsible no-ap active"
         aria-expanded="false"
       >
-        OTA Update
+        Firmware Update
       </button>
       
       <div class="sub-collapsible-content no-ap" aria-hidden="true">
         <div class="content-wrapper" id="otaupdate">
-      <div class="toggle-padding device-info" id="ota-settings">
-      <label class="toggle-row-lg donation-toggle-row">
-        <strong>Sister Affirmations &amp; Cheerful Messages ❤️</strong>   
-      </label>
-      <span class="small">Periodic sweet reminders &amp; uplifting love sent to your sister's display ✨</span>
-      <br>
-
-      <label class="toggle-row-lg donation-toggle-row">
-        <span class="label-text">Enable Sister Affirmations:</span>
-        <span class="toggle-switch">
-          <input type="checkbox" id="hideDonationMsg">
-          <span class="toggle-slider"></span>
-        </span>
-      </label>
-
-      <p class="donation-note">
-        When enabled, SisterClock periodically surprises her with heartwarming affirmations (e.g., "HAVE A WONDERFUL DAY, SIS! ❤️", "YOU MAKE THE WORLD BRIGHTER! ✨").
-      </p>
-
-      <div id="ota-container">
-        <button type="button" id="btn-check-ota" onclick="checkUpdate()" class="primary-button cmsg1">
-          Check for Updates
-        </button>
-
-        <div id="ota-update-found">
-          <button type="button" onclick="performUpdate()" class="primary-button cmsg1">
-            Install Update
-          </button>
+          <div class="toggle-padding device-info" id="ota-settings">
+            <strong>SisterClock Firmware Management</strong>
+            <p class="small" style="margin-top: 4px; margin-bottom: 12px; color: #cbd5e1;">
+              Custom Gift Edition &bull; ESP8266 Wemos D1 Mini (MakerWorld 3009244)
+            </p>
+            <div id="ota-container">
+              <label style="display:block; margin-bottom:8px; font-size:0.9rem; color:#e2e8f0;">
+                Flash New Firmware (.bin):
+              </label>
+              <input type="file" id="otaFileInput" accept=".bin" style="margin-bottom: 12px; font-size: 0.85rem; color:#f8fafc;" />
+              <button type="button" id="btn-upload-ota" onclick="uploadOtaFile()" class="primary-button cmsg1" style="width: 100%;">
+                Upload &amp; Flash Firmware
+              </button>
+              <p id="ota-status-text" style="margin-top: 10px; font-size: 0.9rem;"></p>
+            </div>
+          </div>
         </div>
-
-        <p id="ota-status-text"></p>
       </div>
-
-    </div>
-  </div>
-</div>
 
       <button
         type="button"
@@ -2659,12 +2665,24 @@ const char index_html[] PROGMEM = R"rawliteral(
 
             initClockOnlyDuringDimming(data);
 
-            // --- Donation message toggle ---
+            // --- Sister Affirmations toggle ---
+            const sisterAffirmationsEl = document.getElementById("sisterAffirmations");
+            if (sisterAffirmationsEl) {
+              sisterAffirmationsEl.checked =
+                data.sisterAffirmations !== undefined
+                  ? !!data.sisterAffirmations
+                  : !data.hideDonationMsg;
+              sisterAffirmationsEl.addEventListener("change", function () {
+                setSisterAffirmations(this.checked);
+              });
+            }
             const hideDonationEl = document.getElementById("hideDonationMsg");
             if (hideDonationEl) {
-              hideDonationEl.checked = !!data.hideDonationMsg;
+              hideDonationEl.checked = !(data.sisterAffirmations !== undefined
+                ? !!data.sisterAffirmations
+                : !data.hideDonationMsg);
               hideDonationEl.addEventListener("change", function () {
-                setHideDonationMsg(this.checked);
+                setSisterAffirmations(!this.checked);
               });
             }
 
@@ -2962,7 +2980,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         const newHostname = (
           document.getElementById("hostnameInput").value.toLowerCase() ||
           originalHostname ||
-          "esptimecast"
+          "sisterclock"
         ).trim();
 
         if (!newHostname) {
@@ -3556,15 +3574,45 @@ const char index_html[] PROGMEM = R"rawliteral(
         });
       }
 
-      // --- Donation message opt-out toggle (no reboot) ---
-      function setHideDonationMsg(val) {
-        fetch("/set_hide_donation", {
+      // --- Sister Affirmations toggle & trigger (no reboot) ---
+      function setSisterAffirmations(val) {
+        fetch("/set_sister_affirmations", {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: "value=" + (val ? 1 : 0),
         }).catch((e) => {
-          console.error("Failed to set hideDonationMsg:", e);
+          console.error("Failed to set sisterAffirmations:", e);
         });
+        fetch("/set_hide_donation", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: "value=" + (val ? 0 : 1),
+        }).catch(() => {});
+      }
+
+      function sendAffirmationNow() {
+        showToast("Sending affirmation to SisterClock... ❤️", 2000);
+        fetch("/send_affirmation", {
+          method: "POST",
+        })
+          .then((res) => {
+            if (!res.ok) throw new Error("Failed to send affirmation");
+            return res.text();
+          })
+          .then(() => {
+            showToast("✓ Affirmation sent to sister's display! ❤️", 3500);
+          })
+          .catch((err) => {
+            console.error("Error sending affirmation via POST, falling back to /action:", err);
+            fetch("/action?action=affirmation")
+              .then(() => showToast("✓ Affirmation sent! ❤️", 3500))
+              .catch(() => showToast("⚠️ Failed to send affirmation", 3000));
+          });
+      }
+
+      // --- Legacy Donation message opt-out toggle (no reboot) ---
+      function setHideDonationMsg(val) {
+        setSisterAffirmations(!val);
       }
 
       // Initialize the checkbox from cfg and wire up immediate save (no reboot)
@@ -3921,6 +3969,20 @@ window.addEventListener("load", handleGeoRedirectResult);
           });
       }
 
+      function insertToken(token) {
+        const input = document.getElementById("customMessage");
+        if (!input) return;
+        const start = input.selectionStart || input.value.length;
+        const end = input.selectionEnd || input.value.length;
+        const val = input.value;
+        input.value = val.substring(0, start) + token + val.substring(end);
+        input.focus();
+        const newPos = start + token.length;
+        if (input.setSelectionRange) {
+          input.setSelectionRange(newPos, newPos);
+        }
+      }
+
       // --- Dimming Controls Logic (The correct version) ---
       function setDimmingFieldsEnabled() {
         const apiKeyField = document.getElementById("openWeatherApiKey");
@@ -4120,196 +4182,107 @@ window.addEventListener("load", handleGeoRedirectResult);
         scanBtn.innerText = "Scan";
       };
 
-      async function checkUpdate() {
-        const checkBtn = document.getElementById("btn-check-ota");
-        const updateDiv = document.getElementById("ota-update-found");
+      function uploadOtaFile() {
+        const fileInput = document.getElementById("otaFileInput");
         const statusText = document.getElementById("ota-status-text");
+        const uploadBtn = document.getElementById("btn-upload-ota");
 
-        checkBtn.disabled = true;
-        updateDiv.style.display = "none";
-        statusText.style.color = "";
-        statusText.style.fontWeight = "normal";
-
-        try {
-          // STEP 1: Get current version and specific board type
-          const localRes = await fetch("/get_version");
-          const localData = await localRes.json();
-          const currentVersion = localData.version;
-          const board = localData.board; // e.g., "esp32s3"
-
-          // STEP 2: Fetch latest info from update server
-          const updateRes = await fetch(
-            "https://esptimecast.com/firmware.json?t=" + Date.now(),
-          );
-          if (!updateRes.ok)
-            throw new Error(`Update server returned ${updateRes.status}`);
-
-          const updateData = await updateRes.json();
-          const latestVersion = updateData.version;
-
-          // STEP 3: Semantic Comparison
-          const parseV = (v) =>
-            v
-              .replace(/[^\d.]/g, "")
-              .split(".")
-              .map(Number);
-          const vRemote = parseV(latestVersion);
-          const vLocal = parseV(currentVersion);
-
-          let isNewer = false;
-          for (let i = 0; i < 3; i++) {
-            if ((vRemote[i] || 0) > (vLocal[i] || 0)) {
-              isNewer = true;
-              break;
-            }
-            if ((vRemote[i] || 0) < (vLocal[i] || 0)) {
-              isNewer = false;
-              break;
-            }
-          }
-
-          if (isNewer) {
-            // DYNAMIC LINK SELECTION:
-            // Matches "esp32s3" from device to "esp32s3" in ota.json
-            pendingBinUrl = updateData.bins[board];
-            pendingFromVersion = currentVersion;
-            if (!pendingBinUrl) {
-              throw new Error(`No binary found for board: ${board}`);
-            }
-
-            console.log(`Found Update for ${board}:`, pendingBinUrl);
-
-            statusText.style.fontWeight = "bold";
-            statusText.style.color = "#2ecc71";
-            statusText.innerText = `New v${latestVersion} found! (Current: v${currentVersion})`;
-
-            checkBtn.style.display = "none";
-            updateDiv.style.display = "block";
-          } else {
-            showToast(`Up to date (v${currentVersion})`, 3000);
-            setTimeout(() => {
-              checkBtn.disabled = false;
-              statusText.innerText = "";
-            }, 3000);
-          }
-        } catch (e) {
-          console.error("OTA Check Error:", e);
-          statusText.style.color = "#ff4444";
-          showToast(`⚠️ \u00A0\u00A0${e.message}`, 5000);
-          setTimeout(() => {
-            checkBtn.disabled = false;
-          }, 5000);
-        }
-      }
-
-      async function performUpdate() {
-        if (!pendingBinUrl) {
-          alert("No update URL found. Please check for updates again.");
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+          alert("Please select a .bin firmware file first!");
           return;
         }
 
-        // 1. Initial UI feedback
+        const file = fileInput.files[0];
+        if (!file.name.toLowerCase().endsWith(".bin")) {
+          alert("Selected file must be a .bin firmware file!");
+          return;
+        }
+
+        if (uploadBtn) uploadBtn.disabled = true;
         showSavingModal(
-          "<h3>🚀 Preparing Device...</h3><p>Entering update mode.</p>",
+          "<h3>🚀 Preparing SisterClock...</h3><p>Entering firmware update mode.</p>",
         );
 
-        try {
-          // STEP 1: Signal the ESP to enter "Soft Maintenance" mode
-          // This clears the screen and stops background tasks on the ESP
-          const prepRes = await fetch(`/perform_update`);
-          if (!prepRes.ok)
-            throw new Error("Device refused to enter update mode.");
+        fetch("/perform_update")
+          .catch(() => {})
+          .then(async () => {
+            await new Promise((r) => setTimeout(r, 600));
 
-          // Brief pause to let the ESP UI update (show icon)
-          await new Promise((r) => setTimeout(r, 800));
-
-          // STEP 2: Browser downloads the .bin from GitHub
-          updateSavingModal(
-            "<h3>Step 1/2: Downloading...</h3><p>Fetching firmware from GitHub.</p>",
-            true,
-          );
-
-          const fileRes = await fetch(
-            pendingBinUrl + "?from=" + encodeURIComponent(pendingFromVersion),
-          );
-          if (!fileRes.ok)
-            throw new Error("Could not download firmware from GitHub.");
-
-          const blob = await fileRes.blob();
-          console.log("Downloaded blob size:", blob.size);
-
-          // STEP 3: Browser uploads the blob to the ESP via POST
-          updateSavingModal(
-            "<h3>Step 2/2: Uploading...</h3>" +
-              "<p>Writing to flash memory.</p>" +
-              "<span id='ota-progress-bar' class='ota-progress-value'>0%</span>",
-            true,
-          );
-
-          const formData = new FormData();
-          formData.append("update", blob, "update.bin");
-
-          const xhr = new XMLHttpRequest();
-          xhr.open("POST", "/upload_ota");
-
-          // Track upload progress
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              const percent = Math.round((e.loaded / e.total) * 100);
-              const progressSpan = document.getElementById("ota-progress-bar");
-              if (progressSpan) progressSpan.innerText = percent + "%";
-            }
-          };
-
-          //Handle completion
-          xhr.onload = function () {
-            if (xhr.status === 200 && xhr.responseText.includes("OK")) {
-              document.getElementById("configForm").style.display = "none";
-              document.querySelector(".footer").style.display = "none";
-              document.querySelector("html").style.height = "100vh";
-              document.body.style.height = "100vh";
-              updateSavingModal(
-                "<h3>✅ Update Successful!</h3>" +
-                  "<p><b>ESPTimeCast</b> has been updated to the latest version.<br>Thank you for being part of the community.</p>" +
-                  "<p>❤️ <b>Built with love in Osaka!</b></p>" +
-                  "<p><span id='modal-countdown'>Device is rebooting in 25</span></p>",
-                false,
-              );
-              // Start countdown for page refresh
-              let count = 25;
-              const timer = setInterval(() => {
-                count--;
-                const counter = document.getElementById("modal-countdown");
-                if (counter)
-                  counter.innerText = `Device is rebooting in ${count}s`;
-                if (count <= 0) {
-                  clearInterval(timer);
-                  location.reload();
-                }
-              }, 1000);
-            } else {
-              updateSavingModal(
-                "<h3>❌ Upload Failed</h3><p>The device rejected the file.</p>",
-                false,
-              );
-            }
-          };
-
-          xhr.onerror = () => {
             updateSavingModal(
-              "<h3>❌Connection Lost</h3><p>Check your Wi-Fi and try again.</p>",
-              false,
+              "<h3>Step 1/1: Uploading Firmware...</h3>" +
+                "<p>Writing SisterClock firmware to flash memory.</p>" +
+                "<span id='ota-progress-bar' class='ota-progress-value'>0%</span>",
+              true,
             );
-          };
 
-          xhr.send(formData);
-        } catch (e) {
-          console.error("OTA Error:", e);
-          updateSavingModal(
-            "<h3>❌ Update Error</h3><p>" + e.message + "</p>",
-            false,
-          );
-        }
+            const formData = new FormData();
+            formData.append("update", file, file.name);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open("POST", "/upload_ota");
+
+            xhr.upload.onprogress = (e) => {
+              if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                const progressSpan = document.getElementById("ota-progress-bar");
+                if (progressSpan) progressSpan.innerText = percent + "%";
+              }
+            };
+
+            xhr.onload = function () {
+              if (xhr.status === 200 && xhr.responseText.includes("OK")) {
+                const cfgForm = document.getElementById("configForm");
+                if (cfgForm) cfgForm.style.display = "none";
+                const footer = document.querySelector(".footer");
+                if (footer) footer.style.display = "none";
+                updateSavingModal(
+                  "<h3>✅ Update Successful!</h3>" +
+                    "<p><b>SisterClock</b> firmware has been successfully flashed.<br>Your sister's personalized clock is restarting.</p>" +
+                    "<p>❤️ <b>Custom Sister Gift Edition</b> ✨</p>" +
+                    "<p><span id='modal-countdown'>Device is rebooting in 15s</span></p>",
+                  false,
+                );
+                let count = 15;
+                const timer = setInterval(() => {
+                  count--;
+                  const counter = document.getElementById("modal-countdown");
+                  if (counter) counter.innerText = `Device is rebooting in ${count}s`;
+                  if (count <= 0) {
+                    clearInterval(timer);
+                    location.reload();
+                  }
+                }, 1000);
+              } else {
+                if (uploadBtn) uploadBtn.disabled = false;
+                updateSavingModal(
+                  "<h3>❌ Upload Failed</h3><p>The device rejected the firmware file.</p>",
+                  false,
+                );
+              }
+            };
+
+            xhr.onerror = () => {
+              if (uploadBtn) uploadBtn.disabled = false;
+              updateSavingModal(
+                "<h3>❌ Connection Lost</h3><p>Check your Wi-Fi connection and try again.</p>",
+                false,
+              );
+            };
+
+            xhr.send(formData);
+          })
+          .catch((err) => {
+            if (uploadBtn) uploadBtn.disabled = false;
+            updateSavingModal("<h3>❌ Update Error</h3><p>" + err.message + "</p>", false);
+          });
+      }
+
+      function checkUpdate() {
+        showToast("SisterClock uses direct local firmware file flashing.", 3500);
+      }
+
+      function performUpdate() {
+        uploadOtaFile();
       }
 
       document.addEventListener("keydown", function (event) {
@@ -5381,7 +5354,7 @@ function _alarmSoundOpts(selected) {
         }, duration);
       }
 
-      const TUNES_STORAGE_KEY = "esptimecast_tunes";
+      const TUNES_STORAGE_KEY = "sisterclock_tunes";
 let _customTunes = JSON.parse(localStorage.getItem(TUNES_STORAGE_KEY) || "[]");
 
 function handleTunesFile(event) {
