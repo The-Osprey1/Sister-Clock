@@ -173,6 +173,13 @@ BuzzerPattern buzzerCustomPattern = { buzzerCustomScratch, 0, false };
 extern bool readTuneLine(uint8_t index, char *out, size_t maxLen);
 extern uint8_t tuneCount;
 
+inline uint8_t getMaxSoundId() {
+  return 3 + BUZZER_BUILTIN_RTTTL_COUNT + tuneCount;
+}
+inline bool isValidAlarmSound(int s) {
+  return (s >= 1 && s <= (int)getMaxSoundId());
+}
+
 inline const BuzzerPattern* getSoundPattern(uint8_t id) {
   if (id >= 4 && id < 4 + BUZZER_BUILTIN_RTTTL_COUNT) {
     uint8_t n = buzzerParseRtttl(BUZZER_BUILTIN_RTTTL[id - 4], buzzerCustomScratch, BUZZER_RTTTL_MAX_STEPS);

@@ -292,7 +292,11 @@ unsigned long totalUptimeSeconds = 0;              // Persistent accumulated upt
 // Unified OTA Control Variables
 unsigned long otaLastActivity = 0;
 const unsigned long OTA_IDLE_TIMEOUT_MS = 30000;
-bool isUpdating = false;      // When true, all background tasks (Weather, NTP, Scroll) stop
+bool isUpdating = false;
+static String otaAuthToken = "";
+static unsigned long otaWindowStart = 0;
+const unsigned long OTA_WINDOW_MS = 300000;  // 5 minute authorized update window
+      // When true, all background tasks (Weather, NTP, Scroll) stop
 bool pendingRestart = false;  // Flag to trigger a safe reboot in the loop
 bool pendingConfigSave = false;
 unsigned long restartTimer = 0;  // Timer to give the WebServer time to send the final "OK"
@@ -491,11 +495,21 @@ bool writeConfigSafely(JsonDocument &doc) {
   size_t expected = measureJson(doc);
   size_t written = serializeJson(doc, out);
   out.close();
-  if (!expected || written != expected) { LittleFS.remove(temp); return false; }
+  if (!expected || written != expected || written <= 10) { LittleFS.remove(temp); return false; }
   File verify = LittleFS.open(temp, "r");
-  JsonDocument check;
-  bool valid = verify && !deserializeJson(check, verify) && check.is<JsonObject>();
-  if (verify) verify.close();
+  bool valid = false;
+  if (verify) {
+    char firstChar = 0;
+    while (verify.available()) {
+      char c = (char)verify.read();
+      if (!isspace(c)) {
+        firstChar = c;
+        break;
+      }
+    }
+    valid = (firstChar == '{');
+    verify.close();
+  }
   if (!valid) { LittleFS.remove(temp); return false; }
   if (LittleFS.exists("/config.json")) {
     if (LittleFS.exists("/config.bak") && !LittleFS.remove("/config.bak")) { LittleFS.remove(temp); return false; }
@@ -2173,12 +2187,13 @@ void setupWebServer() {
   // These headers allow the browser to verify the security policy for all routes.
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-Source");
+  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-Source, X-OTA-Token");
 
   // Root handler with BOTH CORS and Cache-Prevention
   // Root & index.html handlers with BOTH CORS and Cache-Prevention
   auto sendIndexHtml = [](AsyncWebServerRequest *request) {
-    AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html);
+    AsyncWebServerResponse *response = request->beginResponse_P(200, "text/html", index_html_gz, sizeof(index_html_gz));
+    response->addHeader("Content-Encoding", "gzip");
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
@@ -2256,7 +2271,7 @@ void setupWebServer() {
 
   server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request) {
     Serial.printf(PSTR("[HEAP] /save entry: free=%u largest=%u\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());  //debug
-    if (getLargestFreeBlock() < 4000) {
+    if (getLargestFreeBlock() < 1500) {
       Serial.printf(PSTR("[SAVE] Aborting: heap too fragmented (%u largest)\n"), getLargestFreeBlock());
       request->send(503, "application/json", "{\"error\":\"Device busy, please try again in a moment.\"}");
       return;
@@ -2390,16 +2405,18 @@ void setupWebServer() {
     utf8ToLatin1(customMessageUtf8);
     strlcpy(customMessage, customMessageUtf8.c_str(), sizeof(customMessage));
     okDoc[F("message")] = "Saved successfully. Rebooting...";
-    String response;
-    serializeJson(okDoc, response);
-    request->send(200, "application/json", response);
+    String responseJson;
+    serializeJson(okDoc, responseJson);
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", responseJson);
+    response->addHeader("Connection", "close");
+    request->send(response);
     Serial.println(F("[WEBSERVER] Sending success response and scheduling reboot..."));
 
     request->onDisconnect([]() {
       Serial.println(F("[WEBSERVER] Client disconnected, rebooting ESP..."));
       saveUptime();
       isRebooting = true;
-      delay(100);  // ensure file is written
+      delay(250);  // ensure file is written and TCP buffers flush
       ESP.restart();
     });
   });
@@ -2740,6 +2757,9 @@ void setupWebServer() {
         String p = "alarm" + String(i) + "_";
         if (request->hasParam(p + "enabled", true)) {
           alarmConfigs[i].enabled = request->getParam(p + "enabled", true)->value() == "1";
+          if (!alarmConfigs[i].enabled) {
+            alarmSnoozedUntil[i] = 0;
+          }
         }
         if (request->hasParam(p + "hour", true)) {
           alarmConfigs[i].hour = constrain(request->getParam(p + "hour", true)->value().toInt(), 0, 23);
@@ -2761,7 +2781,12 @@ void setupWebServer() {
         }
         if (request->hasParam(p + "sound", true)) {
           int s = request->getParam(p + "sound", true)->value().toInt();
-          if (s >= 1 && s <= 6 + tuneCount) alarmConfigs[i].sound = (uint8_t)s;
+          if (isValidAlarmSound(s)) {
+            alarmConfigs[i].sound = (uint8_t)s;
+          } else {
+            request->send(400, "application/json", "{\"error\":\"Invalid alarm sound ID\"}");
+            return;
+          }
         }
       }
 
@@ -2770,7 +2795,7 @@ void setupWebServer() {
     });
 
     server.on("/save_weather", HTTP_POST, [](AsyncWebServerRequest *request) {
-      if (getLargestFreeBlock() < 4000) {
+      if (getLargestFreeBlock() < 1500) {
         request->send(503, "application/json", "{\"error\":\"Device busy, please try again in a moment.\"}");
         return;
       }
@@ -2809,7 +2834,7 @@ void setupWebServer() {
     });
 
     server.on("/save_timedate", HTTP_POST, [](AsyncWebServerRequest *request) {
-      if (getLargestFreeBlock() < 4000) {
+      if (getLargestFreeBlock() < 1500) {
         request->send(503, "application/json", "{\"error\":\"Device busy, please try again in a moment.\"}");
         return;
       }
@@ -2849,7 +2874,7 @@ void setupWebServer() {
     });
 
     server.on("/save_display", HTTP_POST, [](AsyncWebServerRequest *request) {
-      if (getLargestFreeBlock() < 4000) {
+      if (getLargestFreeBlock() < 1500) {
         request->send(503, "application/json", "{\"error\":\"Device busy, please try again in a moment.\"}");
         return;
       }
@@ -2900,7 +2925,7 @@ void setupWebServer() {
     });
 
     server.on("/save_countdown", HTTP_POST, [](AsyncWebServerRequest *request) {
-      if (getLargestFreeBlock() < 4000) {
+      if (getLargestFreeBlock() < 1500) {
         request->send(503, "application/json", "{\"error\":\"Device busy, please try again in a moment.\"}");
         return;
       }
@@ -3416,32 +3441,63 @@ void setupWebServer() {
     request->send(200, "application/json", json);
   });
 
-  server.on("/perform_update", HTTP_GET, [](AsyncWebServerRequest *request) {
-    // The upload handler starts update mode when data arrives.
+  server.on("/perform_update", HTTP_ANY, [](AsyncWebServerRequest *request) {
+    // Generate an authorized 16-character hex token
+    char tokenBuf[17];
+    for (int i = 0; i < 8; i++) {
+      uint8_t r = os_random() & 0xFF;
+      snprintf(&tokenBuf[i * 2], 3, "%02x", r);
+    }
+    otaAuthToken = String(tokenBuf);
+    otaWindowStart = millis();
 
     // Immediate UI Feedback
     P.displayClear();
     P.setTextAlignment(PA_CENTER);
     delay(100);
-    P.print((char)172);  // Show your download/update icon
+    P.print((char)172);  // Show download/update icon
 
-    request->send(200, "application/json", "{\"status\":\"ready\"}");
+    String json = "{\"status\":\"ready\",\"token\":\"" + otaAuthToken + "\"}";
+    request->send(200, "application/json", json);
+  });
+
+  server.on("/upload_ota", HTTP_OPTIONS, [](AsyncWebServerRequest *request) {
+    request->send(204);
   });
 
   server.on(
     "/upload_ota", HTTP_POST, [](AsyncWebServerRequest *request) {
+      bool isAuthorized = (otaAuthToken.length() > 0) &&
+                          ((int32_t)(millis() - (otaWindowStart + OTA_WINDOW_MS)) < 0) &&
+                          ((request->hasHeader("X-OTA-Token") && request->getHeader("X-OTA-Token")->value() == otaAuthToken) ||
+                           (request->hasArg("token") && request->arg("token") == otaAuthToken));
+      if (!isAuthorized) {
+        request->send(401, "text/plain", "Unauthorized: Invalid or expired OTA token");
+        return;
+      }
       if (!Update.hasError()) {
         request->send(200, "text/plain", "OK");
+        otaAuthToken = "";
         // Set flags to reboot in the main loop
         pendingRestart = true;
         restartTimer = millis();
       } else {
         isUpdating = false;
+        otaAuthToken = "";
         Update.end(false);
         request->send(500, "text/plain", "FAIL");
       }
     },
     [](AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
+      bool isAuthorized = (otaAuthToken.length() > 0) &&
+                          ((int32_t)(millis() - (otaWindowStart + OTA_WINDOW_MS)) < 0) &&
+                          ((request->hasHeader("X-OTA-Token") && request->getHeader("X-OTA-Token")->value() == otaAuthToken) ||
+                           (request->hasArg("token") && request->arg("token") == otaAuthToken));
+      if (!isAuthorized) {
+        Update.end(false);
+        return;
+      }
+
       // This runs for every chunk of data received
       otaLastActivity = millis();
       if (!index) {
@@ -4634,7 +4690,7 @@ bool handleAlarmCommand(String cmd) {
 
     if (tokenCount >= 3) {
       int soundId = tokens[2].toInt();
-      if (soundId >= 1 && soundId <= 6 + tuneCount) alarmConfigs[index].sound = (uint8_t)soundId;
+      if (isValidAlarmSound(soundId)) alarmConfigs[index].sound = (uint8_t)soundId;
     }
     if (tokenCount >= 4) {
       int bri = tokens[3].toInt();
@@ -5152,8 +5208,13 @@ void executeAction(const String &action, const String &value) {
     }
 
     if (sub == "stop") {
+      buzzerStop();
+      if (prefix.length() > 5) {
+        alarmSnoozedUntil[index] = 0;
+      } else {
+        for (int i = 0; i < MAX_ALARMS; i++) alarmSnoozedUntil[i] = 0;
+      }
       if (alarmRinging) {
-        buzzerStop();
         showAlarmNotification("ALARM OFF");
       }
 
@@ -5162,6 +5223,9 @@ void executeAction(const String &action, const String &value) {
 
     } else if (sub == "enable") {
       alarmConfigs[index].enabled = hasValue ? boolVal : !alarmConfigs[index].enabled;
+      if (!alarmConfigs[index].enabled) {
+        alarmSnoozedUntil[index] = 0;
+      }
       configDirty = true;
       lastBrightnessChange = millis();
 
@@ -5237,7 +5301,7 @@ void executeAction(const String &action, const String &value) {
 
       setAlarmSchedule(index, h, m, days);
 
-      if (soundId >= 1 && soundId <= 6 + tuneCount) alarmConfigs[index].sound = (uint8_t)soundId;
+      if (isValidAlarmSound(soundId)) alarmConfigs[index].sound = (uint8_t)soundId;
       if (bri >= 0 && bri <= 15) alarmConfigs[index].brightness = (uint8_t)bri;
       if (snooze >= 1 && snooze <= 60) alarmConfigs[index].snoozeMinutes = (uint8_t)snooze;
       if (vol >= 1 && vol <= 10) buzzerConfig.volume = (uint8_t)vol;
@@ -5732,7 +5796,7 @@ String rewindTimeString(String hms, int secs) {
 void buzzerLoop() {
   if (buzzerState != BUZZER_PLAYING || !buzzerActivePattern) return;
 
-  if (buzzerEventStopAt != 0 && millis() >= buzzerEventStopAt) {
+  if (buzzerEventStopAt != 0 && (int32_t)(millis() - buzzerEventStopAt) >= 0) {
     buzzerStop();
     return;
   }
@@ -5792,7 +5856,7 @@ void fireAlarm(int index, int brightnessOverride, int soundOverride) {
   forceMessageRestart = true;
 
   if (buzzerConfig.enabled && buzzerConfig.eventEnabled[BUZZER_EVT_ALARM]) {
-    int soundToUse = (soundOverride >= 1 && soundOverride <= 6 + tuneCount) ? soundOverride : alarmConfigs[index].sound;
+    int soundToUse = isValidAlarmSound(soundOverride) ? soundOverride : alarmConfigs[index].sound;
     buzzerTrigger(getSoundPattern(soundToUse), true, true);
     buzzerRepeating = true;
     buzzerEventStopAt = 0;
@@ -5817,10 +5881,16 @@ void checkAlarmSchedule() {
   if (isRebooting) return;
 
   for (int i = 0; i < MAX_ALARMS; i++) {
-    if (alarmSnoozedUntil[i] > 0 && millis() >= alarmSnoozedUntil[i]) {
-      alarmSnoozedUntil[i] = 0;
-      fireAlarm(i, -1, -1);
-      return;
+    if (alarmSnoozedUntil[i] > 0) {
+      if (!alarmConfigs[i].enabled) {
+        alarmSnoozedUntil[i] = 0;
+        continue;
+      }
+      if ((int32_t)(millis() - alarmSnoozedUntil[i]) >= 0) {
+        alarmSnoozedUntil[i] = 0;
+        fireAlarm(i, -1, -1);
+        return;
+      }
     }
   }
 
@@ -5847,7 +5917,7 @@ void checkAlarmSchedule() {
 
 void checkAlarmTimeout() {
   if (!alarmRinging || !alarmStopAt) return;
-  if (millis() >= alarmStopAt) {
+  if ((int32_t)(millis() - alarmStopAt) >= 0) {
     Serial.println(F("[ALARM] Timed out (15 min), stopping."));
     buzzerStop();
   }

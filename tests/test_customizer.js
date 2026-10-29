@@ -7,7 +7,18 @@ const end = html.indexOf('      // Initialize the checkbox from cfg', begin);
 assert(begin >= 0 && end > begin);
 const elements = {};
 for (const id of ['btn-12h','btn-24h','twelveHourToggle','showDayOfWeek','colonBlinkEnabled','btn-showdate-yes','btn-showdate-no','showDate','brightnessSlider','brightnessValue','mobile-bright-slider','mobile-bright-val', ...[0,1,2].map(i=>'clock-style-'+i), ...[0,1,2].map(i=>'alarm-style-'+i)]) {
-  elements[id] = {checked:true,value:'7',textContent:'',active:false, classList: {toggle(_,state) { elements[id].active=state; }}};
+  elements[id] = {
+    checked: true,
+    value: '7',
+    textContent: '',
+    active: false,
+    attributes: {},
+    setAttribute(name, val) { this.attributes[name] = String(val); },
+    getAttribute(name) { return this.attributes[name]; },
+    classList: {
+      toggle(_, state) { elements[id].active = state; }
+    }
+  };
 }
 let ok = true;
 const toasts = [];
@@ -19,6 +30,7 @@ vm.runInContext(html.slice(begin,end),ctx);
  assert.equal(elements.showDayOfWeek.checked,false);
  assert.equal(elements.colonBlinkEnabled.checked,false);
  assert.equal(elements['clock-style-0'].active,true);
+ assert.equal(elements['clock-style-0'].getAttribute('aria-pressed'),'true');
  ok=false;
  await ctx.chooseClockStyle(1);
  assert.equal(elements.showDayOfWeek.checked,false);

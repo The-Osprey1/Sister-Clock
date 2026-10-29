@@ -343,3 +343,33 @@ def test_index_html_js_syntax_integrity():
     open_braces = clean_js.count('{')
     close_braces = clean_js.count('}')
     assert open_braces == close_braces, f"Mismatched braces in JS: {open_braces} open vs {close_braces} close"
+
+def test_firmware_bugfixes_and_security_hardening():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+    with open(os.path.join(FIRMWARE_DIR, 'buzzer.h'), 'r', encoding='utf-8') as f:
+        buzzer = f.read()
+
+    # Issue 1: OTA Authorization and Session Token
+    assert 'otaAuthToken' in ino
+    assert 'X-OTA-Token' in ino
+    assert '401' in ino and 'Unauthorized: Invalid or expired OTA token' in ino
+
+    # Issue 2: Alarm sound validation derived from BUZZER_BUILTIN_RTTTL_COUNT
+    assert 'isValidAlarmSound' in buzzer
+    assert 'getMaxSoundId' in buzzer
+    assert 'isValidAlarmSound(s)' in ino
+    assert 'Invalid alarm sound ID' in ino
+
+    # Issue 3: Disabling / stopping snoozed alarm clears pending snooze
+    assert 'alarmSnoozedUntil[i] = 0' in ino
+    assert 'if (!alarmConfigs[i].enabled)' in ino
+
+    # Issue 4: Wrap-safe millis comparison
+    assert '(int32_t)(millis() - alarmStopAt) >= 0' in ino
+    assert '(int32_t)(millis() - alarmSnoozedUntil[i]) >= 0' in ino
+    assert '(int32_t)(millis() - buzzerEventStopAt) >= 0' in ino
+
+    # Issue 5 / Mobile performance: Pre-compressed gzip served in PROGMEM
+    assert 'index_html_gz' in ino
+    assert 'Content-Encoding' in ino and 'gzip' in ino
