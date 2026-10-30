@@ -375,3 +375,45 @@ def test_firmware_bugfixes_and_security_hardening():
     # Issue 5 / Mobile performance: Pre-compressed gzip served in PROGMEM
     assert 'index_html_gz' in ino
     assert 'Content-Encoding' in ino and 'gzip' in ino
+
+
+def test_weather_fetch_network_resilience_and_timeout():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # Weather fetch must check and set isNetworkBusy
+    assert 'if (isNetworkBusy) {' in ino and '[WEATHER] Skipped: Network busy' in ino
+    assert 'WeatherNetworkGuard' in ino, "Weather fetch must use RAII cleanup for guaranteed socket release"
+    assert 'http.setTimeout(3500)' in ino, "HTTP timeout must be <= 4000ms to prevent watchdog triggers"
+    assert 'isNetworkBusy = false;' in ino
+
+def test_ap_mode_reconnect_and_timer_reset():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # apStartTime must be reset upon STA connection
+    assert 'apStartTime = 0;' in ino
+    assert 'Transitioning from AP mode to STA mode' in ino
+    assert 'dnsServer.stop();' in ino
+
+def test_save_config_runtime_heap_threshold_and_throttle():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # Threshold must not exceed 2000 bytes
+    assert 'getLargestFreeBlock() < 1500' in ino
+    # Auto-save backoff must exist in loop()
+    assert 'lastAutoSaveAttempt' in ino
+    assert 'millis() - lastAutoSaveAttempt >= 5000' in ino
+
+def test_uptime_rtc_buffering_and_flash_wear_reduction():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # RTC user memory support for ESP8266
+    assert 'ESP.rtcUserMemoryRead' in ino
+    assert 'ESP.rtcUserMemoryWrite' in ino
+    assert '0x53434C4B' in ino  # 'SCLK' magic
+    # Flash save throttled to 12 hours
+    assert '43200000UL' in ino
+    assert 'saveUptime(true)' in ino  # forced flash on restart

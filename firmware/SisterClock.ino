@@ -329,6 +329,7 @@ bool weatherAvailable = false;
 bool weatherFetched = false;
 bool weatherFetchInitiated = false;
 bool isAPMode = false;
+unsigned long apStartTime = 0;
 char tempSymbol = '\006';
 bool shouldFetchWeatherNow = false;
 String currentCityName = "";
@@ -974,6 +975,7 @@ void connectWiFi() {
     Serial.print(F("[WIFI] AP IP address: "));
     Serial.println(WiFi.softAPIP());
     isAPMode = true;
+    apStartTime = millis();
 
     WiFiMode_t mode = WiFi.getMode();
     Serial.printf(PSTR("[WIFI] WiFi mode after setting AP: %s\n"),
@@ -1015,6 +1017,7 @@ void connectWiFi() {
       Serial.print(F("[WIFI] Connected: "));
       Serial.println(WiFi.localIP().toString());
       isAPMode = false;
+      apStartTime = 0;
 
       WiFiMode_t mode = WiFi.getMode();
       Serial.printf(PSTR("[WIFI] WiFi mode after STA connection: %s\n"),
@@ -1070,6 +1073,7 @@ void connectWiFi() {
         dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
         Serial.printf(PSTR("[HEAP] AP mode started: %u free, %u largest\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());
         isAPMode = true;
+    apStartTime = millis();
 
         WiFiMode_t mode = WiFi.getMode();
         Serial.printf(PSTR("[WIFI] WiFi mode after STA failure and setting AP: %s\n"),
@@ -2414,7 +2418,7 @@ void setupWebServer() {
 
     request->onDisconnect([]() {
       Serial.println(F("[WEBSERVER] Client disconnected, rebooting ESP..."));
-      saveUptime();
+      saveUptime(true);
       isRebooting = true;
       delay(250);  // ensure file is written and TCP buffers flush
       ESP.restart();
@@ -2459,7 +2463,7 @@ void setupWebServer() {
       request->send(200, "application/json", response);
       request->onDisconnect([]() {
         Serial.println(F("[WEBSERVER] Rebooting after restore..."));
-        saveUptime();
+        saveUptime(true);
         delay(100);  // ensure file is written
         ESP.restart();
       });
@@ -3892,6 +3896,11 @@ String buildWeatherURL() {
 
 
 void fetchWeather() {
+  if (isNetworkBusy) {
+    Serial.println(F("[WEATHER] Skipped: Network busy"));
+    return;
+  }
+
   if (millis() - lastWifiConnectTime < 5000) {
     Serial.println(F("[WEATHER] Skipped: Network just reconnected. Letting it stabilize..."));
     return;  // Stop execution if connection is less than 5 seconds old
@@ -3916,6 +3925,8 @@ void fetchWeather() {
     return;
   }
 
+  isNetworkBusy = true;
+
   Serial.println(F("[WEATHER] Connecting to OpenWeatherMap..."));
   String url = buildWeatherURL();
   String logUrl = url;
@@ -3928,6 +3939,14 @@ void fetchWeather() {
   Serial.println(logUrl);
 
   HTTPClient http;  // Create an HTTPClient object
+
+  struct WeatherNetworkGuard {
+    HTTPClient &client;
+    ~WeatherNetworkGuard() {
+      client.end();
+      isNetworkBusy = false;
+    }
+  } networkGuard{http};
 
 #if defined(ESP8266) || defined(CONFIG_IDF_TARGET_ESP32S2)
   // ===== ESP8266 → HTTP =====
@@ -3946,7 +3965,7 @@ void fetchWeather() {
   http.begin(client, url);
 #endif
 
-  http.setTimeout(10000);  // Sets both connection and stream timeout to 10 seconds
+  http.setTimeout(3500);  // Sets timeout to 3.5 seconds to avoid freezing display/watchdog
 
   Serial.println(F("[WEATHER] Sending GET request..."));
   int httpCode = http.GET();  // Send the GET request
@@ -3965,6 +3984,8 @@ void fetchWeather() {
       Serial.print(F("[WEATHER] JSON parse error: "));
       Serial.println(error.f_str());
       weatherAvailable = false;
+      http.end();
+      isNetworkBusy = false;
       return;
     }
 
@@ -3978,6 +3999,8 @@ void fetchWeather() {
     } else {
       Serial.println(F("[WEATHER] Temperature not found in JSON payload"));
       weatherAvailable = false;
+      http.end();
+      isNetworkBusy = false;
       return;
     }
 
@@ -4105,6 +4128,7 @@ void fetchWeather() {
   }
 
   http.end();
+  isNetworkBusy = false;
 }
 
 void fetchNightscout() {
@@ -4267,45 +4291,75 @@ void fetchNightscout() {
 
 
 // -----------------------------
-// Load uptime from LittleFS
+// RTC and Flash Uptime Management
 // -----------------------------
+#ifdef ESP8266
+struct RtcUptimeData {
+  uint32_t magic;      // 0x53434C4B ("SCLK")
+  uint32_t uptimeSec;
+};
+#define RTC_UPTIME_BLOCK 65
+#endif
+
 void loadUptime() {
+  totalUptimeSeconds = 0;
   if (LittleFS.exists("/uptime.dat")) {
     File f = LittleFS.open("/uptime.dat", "r");
     if (f) {
       totalUptimeSeconds = f.parseInt();
       f.close();
-      bootMillis = millis();
-      Serial.printf(PSTR("[UPTIME] Loaded accumulated uptime: %lu seconds (%.2f hours)\n"),
+      Serial.printf(PSTR("[UPTIME] Loaded accumulated uptime from flash: %lu seconds (%.2f hours)\n"),
                     totalUptimeSeconds, totalUptimeSeconds / 3600.0);
     } else {
       Serial.println(F("[UPTIME] Failed to open /uptime.dat for reading."));
-      totalUptimeSeconds = 0;
-      bootMillis = millis();
     }
   } else {
     Serial.println(F("[UPTIME] No previous uptime file found. Starting from 0."));
-    totalUptimeSeconds = 0;
-    bootMillis = millis();
   }
+
+#ifdef ESP8266
+  RtcUptimeData rtcData;
+  if (ESP.rtcUserMemoryRead(RTC_UPTIME_BLOCK, (uint32_t *)&rtcData, sizeof(rtcData))) {
+    if (rtcData.magic == 0x53434C4B && rtcData.uptimeSec >= totalUptimeSeconds) {
+      totalUptimeSeconds = rtcData.uptimeSec;
+      Serial.printf(PSTR("[UPTIME] Restored uptime from RTC memory: %lu seconds (%.2f hours)\n"),
+                    totalUptimeSeconds, totalUptimeSeconds / 3600.0);
+    }
+  }
+#endif
+
+  bootMillis = millis();
 }
 
-// -----------------------------
-// Save uptime to LittleFS
-// -----------------------------
-void saveUptime() {
-  // Use getTotalRuntimeSeconds() to include current session
+void saveUptime(bool forceFlash) {
   totalUptimeSeconds = getTotalRuntimeSeconds();
   bootMillis = millis();  // reset session start
 
-  File f = LittleFS.open("/uptime.dat", "w");
-  if (f) {
-    f.print(totalUptimeSeconds);
-    f.close();
-    Serial.printf(PSTR("[UPTIME] Saved accumulated uptime: %s\n"), formatTotalRuntime().c_str());
-  } else {
-    Serial.println(F("[UPTIME] Failed to write /uptime.dat"));
+#ifdef ESP8266
+  RtcUptimeData rtcData;
+  rtcData.magic = 0x53434C4B;
+  rtcData.uptimeSec = totalUptimeSeconds;
+  ESP.rtcUserMemoryWrite(RTC_UPTIME_BLOCK, (uint32_t *)&rtcData, sizeof(rtcData));
+#endif
+
+  static unsigned long lastFlashSave = 0;
+  const unsigned long flashSaveInterval = 43200000UL;  // 12 hours
+
+  if (forceFlash || lastFlashSave == 0 || millis() - lastFlashSave >= flashSaveInterval) {
+    lastFlashSave = millis();
+    File f = LittleFS.open("/uptime.dat", "w");
+    if (f) {
+      f.print(totalUptimeSeconds);
+      f.close();
+      Serial.printf(PSTR("[UPTIME] Persisted uptime to flash: %s\n"), formatTotalRuntime().c_str());
+    } else {
+      Serial.println(F("[UPTIME] Failed to write /uptime.dat"));
+    }
   }
+}
+
+void saveUptime() {
+  saveUptime(false);
 }
 
 void setAlarmSchedule(int index, int hour, int minute, const bool days[7]) {
@@ -6260,7 +6314,7 @@ bool saveCountdownConfig(bool enabled, time_t targetTimestamp, const String &lab
 }
 
 bool saveConfigRuntime() {
-  if (getLargestFreeBlock() < 4000) {
+  if (getLargestFreeBlock() < 1500) {
     Serial.println(F("[CONFIG] Skipping auto-save: heap too fragmented, will retry next cycle"));
     return false;
   }
@@ -6572,6 +6626,20 @@ void loop() {
         wasConnected = true;
         staAttemptInProgress = false;
         reconnectInterval = 5000;
+        lastWifiConnectTime = millis();
+        if (isAPMode) {
+          Serial.println(F("[WIFI] Transitioning from AP mode to STA mode"));
+          isAPMode = false;
+          apStartTime = 0;
+          dnsServer.stop();
+          WiFi.mode(WIFI_STA);
+          P.displayClear();
+          if (ntpState != NTP_SUCCESS) {
+            ntpState = NTP_SYNCING;
+            ntpStartTime = millis();
+            ntpRetryCount = 0;
+          }
+        }
       }
     }
   }
@@ -6587,6 +6655,7 @@ void loop() {
   // 1. REBOOT HANDLER: Execute the restart outside of the Async callback
   if (pendingRestart && (millis() - restartTimer > 2000)) {
     Serial.println(F("[SYSTEM] Rebooting now..."));
+    saveUptime(true);
     ESP.restart();
   }
   // 2. OTA LOCK: If updating, yield to WiFi and stop everything else
@@ -6600,15 +6669,17 @@ void loop() {
   if (isAPMode) {
     dnsServer.processNextRequest();
     if (credentialsExist()) {
-      static unsigned long apStartTime = 0;
       if (apStartTime == 0) apStartTime = millis();  // Mark the start time once
 
       // 3 Minutes = 180000 ms
       if (millis() - apStartTime > 180000) {
         Serial.println(F("[WIFI] AP Timeout: Saved credentials found. Rebooting to retry connection..."));
+        saveUptime(true);
         delay(500);
         ESP.restart();
       }
+    } else {
+      apStartTime = 0;
     }
     // AP Mode animation from original repo
     static unsigned long apAnimTimer = 0;
@@ -8384,10 +8455,14 @@ void loop() {
   const unsigned long uptimeLogInterval = 600000UL;  // 10 minutes in ms
 
   // ---- CONFIG AUTO SAVE ----
+  static unsigned long lastAutoSaveAttempt = 0;
   if (configDirty && !alarmRinging && millis() - lastBrightnessChange > saveDelay) {
-    if (saveConfigRuntime()) {
-      configDirty = false;
-      Serial.println(F("[CONFIG] Auto-saved"));
+    if (millis() - lastAutoSaveAttempt >= 5000) {
+      lastAutoSaveAttempt = millis();
+      if (saveConfigRuntime()) {
+        configDirty = false;
+        Serial.println(F("[CONFIG] Auto-saved"));
+      }
     }
   }
 
