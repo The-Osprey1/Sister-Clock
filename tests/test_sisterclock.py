@@ -417,3 +417,61 @@ def test_uptime_rtc_buffering_and_flash_wear_reduction():
     # Flash save throttled to 12 hours
     assert '43200000UL' in ino
     assert 'saveUptime(true)' in ino  # forced flash on restart
+
+
+def test_factory_reset_wipes_all_backups_and_rtc():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # Factory reset must delete /config.bak and /config.tmp so old settings are never restored
+    assert '"/config.bak"' in ino and '"/config.tmp"' in ino
+    assert 'filesToRemove[] = { "/config.json", "/config.bak", "/config.tmp"' in ino
+    assert 'ESP.rtcUserMemoryWrite(RTC_UPTIME_BLOCK' in ino
+
+def test_ap_mode_postpones_reboot_on_active_client():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # If phone is connected to setup AP, apStartTime must be refreshed so it does not reboot
+    assert 'WiFi.softAPgetStationNum() > 0' in ino
+    assert 'apStartTime = millis();' in ino
+
+def test_reset_wifi_non_blocking_delayed_restart():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    # /reset_wifi must not block with delay() before response is sent
+    reset_section = ino[ino.find('/reset_wifi'):ino.find('/reset_wifi') + 700]
+    assert 'pendingRestart = true;' in reset_section
+    assert 'delay(400);' not in reset_section
+
+def test_perform_update_non_blocking():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    update_section = ino[ino.find('/perform_update'):ino.find('/perform_update') + 600]
+    assert 'delay(100);' not in update_section
+
+def test_save_config_allowlist_protection():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+
+    assert 'isValidConfigKey' in ino
+    assert 'Discarded unknown config key' in ino
+
+def test_test_wifi_endpoint_present():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+    with open(HTML_FILE, 'r', encoding='utf-8') as f:
+        html = f.read()
+
+    assert 'server.on("/test_wifi"' in ino
+    assert 'WIFI_AP_STA' in ino
+    assert '/test_wifi' in html
+
+def test_license_and_version_updated():
+    license_file = os.path.join(BASE_DIR, "LICENSE.txt")
+    assert os.path.isfile(license_file), "LICENSE.txt must exist"
+    with open(VERSION_FILE, 'r', encoding='utf-8') as f:
+        ver = f.read()
+    assert '1.1.0-SisterClock' in ver

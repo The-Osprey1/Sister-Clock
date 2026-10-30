@@ -2183,6 +2183,32 @@ static String statusSectionJson(int section, SnsType snsType, time_t nowTime) {
   }
 }
 
+#ifdef ESP8266
+struct RtcUptimeData {
+  uint32_t magic;      // 0x53434C4B ("SCLK")
+  uint32_t uptimeSec;
+};
+#define RTC_UPTIME_BLOCK 65
+#endif
+
+bool isValidConfigKey(const String &k) {
+  static const char *const VALID_KEYS[] = {
+    "brightness", "regularBrightness", "clockDuration", "weatherDuration",
+    "flipDisplay", "twelveHourToggle", "showDayOfWeek", "showDate", "showHumidity",
+    "colonBlinkEnabled", "dimStartHour", "dimStartMinute", "dimEndHour", "dimEndMinute",
+    "dimBrightness", "showWeatherDescription", "dimmingEnabled", "clockOnlyDuringDimming",
+    "weatherUnits", "hostname", "password", "ssid", "openWeatherApiKey", "openWeatherCity",
+    "openWeatherCountry", "timeZone", "language", "ntpServer1", "ntpServer2",
+    "autoDimmingEnabled", "countdownEnabled", "countdownDate", "countdownTime",
+    "countdownLabel", "isDramaticCountdown", "customMessage", "sisterAffirmations",
+    "clockStyle", "alarmStyle"
+  };
+  for (const char *vk : VALID_KEYS) {
+    if (k == vk) return true;
+  }
+  return false;
+}
+
 void setupWebServer() {
   const bool apSetupOnly = !credentialsExist();
   Serial.println(F("[WEBSERVER] Setting up web server..."));
@@ -2273,6 +2299,7 @@ void setupWebServer() {
     request->send(response);
   });
 
+  
   server.on("/save", HTTP_POST, [](AsyncWebServerRequest *request) {
     Serial.printf(PSTR("[HEAP] /save entry: free=%u largest=%u\n"), ESP.getFreeHeap(), ESP.getMaxFreeBlockSize());  //debug
     if (getLargestFreeBlock() < 1500) {
@@ -2342,8 +2369,10 @@ void setupWebServer() {
         } else {
           Serial.println(F("[SAVE] API key unchanged (mask ignored)."));
         }
-      } else {
+      } else if (isValidConfigKey(n)) {
         doc[n] = v;
+      } else {
+        Serial.printf(PSTR("[SAVE] Discarded unknown config key: %s\n"), n.c_str());
       }
     }
 
@@ -3455,10 +3484,9 @@ void setupWebServer() {
     otaAuthToken = String(tokenBuf);
     otaWindowStart = millis();
 
-    // Immediate UI Feedback
+    // Immediate UI Feedback (non-blocking)
     P.displayClear();
     P.setTextAlignment(PA_CENTER);
-    delay(100);
     P.print((char)172);  // Show download/update icon
 
     String json = "{\"status\":\"ready\",\"token\":\"" + otaAuthToken + "\"}";
@@ -3540,7 +3568,67 @@ void setupWebServer() {
       }
     });
 
-    server.on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+    server.on("/test_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasParam("ssid", true)) {
+      request->send(400, "application/json", "{\"success\":false,\"error\":\"SSID is required\"}");
+      return;
+    }
+    String testSsid = request->getParam("ssid", true)->value();
+    String testPass = request->hasParam("password", true) ? request->getParam("password", true)->value() : "";
+    testSsid.trim();
+
+    if (testSsid.length() == 0) {
+      request->send(400, "application/json", "{\"success\":false,\"error\":\"Wi-Fi network name cannot be empty\"}");
+      return;
+    }
+
+    Serial.printf(PSTR("[WIFI TEST] Preflight testing connection to SSID: %s\n"), testSsid.c_str());
+
+    // Keep softAP active by using WIFI_AP_STA mode during the check
+    WiFi.mode(WIFI_AP_STA);
+    WiFi.begin(testSsid.c_str(), testPass.c_str());
+
+    unsigned long startAttempt = millis();
+    bool connected = false;
+    while (millis() - startAttempt < 8500) {
+      if (WiFi.status() == WL_CONNECTED) {
+        connected = true;
+        break;
+      }
+      delay(150);
+      yield();
+    }
+
+    if (connected) {
+      String ip = WiFi.localIP().toString();
+      Serial.printf(PSTR("[WIFI TEST] Verified! Local IP: %s\n"), ip.c_str());
+      JsonDocument res;
+      res["success"] = true;
+      res["ip"] = ip;
+      res["message"] = "Connected successfully!";
+      String out;
+      serializeJson(res, out);
+      request->send(200, "application/json", out);
+    } else {
+      wl_status_t st = WiFi.status();
+      Serial.printf(PSTR("[WIFI TEST] Failed with status: %d\n"), (int)st);
+      WiFi.disconnect(false);
+      WiFi.mode(WIFI_AP);
+
+      String errMsg = "Could not connect to Wi-Fi. Please check your password.";
+      if (st == WL_NO_SSID_AVAIL) {
+        errMsg = "Network not found. Please check the Wi-Fi name.";
+      }
+      JsonDocument res;
+      res["success"] = false;
+      res["error"] = errMsg;
+      String out;
+      serializeJson(res, out);
+      request->send(200, "application/json", out);
+    }
+  });
+
+  server.on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
     Serial.println(F("[WIFI] Reset Wi-Fi requested -> clearing credentials and entering setup mode"));
     JsonDocument doc;
     File f = LittleFS.open("/config.json", "r");
@@ -3551,9 +3639,11 @@ void setupWebServer() {
     doc["ssid"] = "";
     doc["password"] = "";
     writeConfigSafely(doc);
-    request->send(200, "application/json", "{\"ok\":true,\"message\":\"Entering setup mode...\"}");
-    delay(400);
-    ESP.restart();
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", "{\"ok\":true,\"message\":\"Entering setup mode...\"}");
+    response->addHeader("Connection", "close");
+    request->send(response);
+    pendingRestart = true;
+    restartTimer = millis() - 1000;
   });
 
 server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -3626,8 +3716,8 @@ server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
       // Small delay to ensure the response buffer is flushed before file ops
       delay(500);
 
-      // --- Remove configuration and uptime files ---
-      const char *filesToRemove[] = { "/config.json", "/uptime.dat", "/index.html" };
+      // --- Remove configuration, backup, and uptime files ---
+      const char *filesToRemove[] = { "/config.json", "/config.bak", "/config.tmp", "/uptime.dat", "/index.html" };
       for (auto &file : filesToRemove) {
         if (LittleFS.exists(file)) {
           if (LittleFS.remove(file)) {
@@ -3639,6 +3729,12 @@ server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
           Serial.printf(PSTR("[RESET] %s not found, skipping delete.\n"), file);
         }
       }
+
+#ifdef ESP8266
+      // Reset RTC uptime memory
+      RtcUptimeData rtcData = {0, 0};
+      ESP.rtcUserMemoryWrite(RTC_UPTIME_BLOCK, (uint32_t *)&rtcData, sizeof(rtcData));
+#endif
 
 // --- Clear Wi-Fi credentials ---
 #if defined(ESP8266)
@@ -4293,13 +4389,7 @@ void fetchNightscout() {
 // -----------------------------
 // RTC and Flash Uptime Management
 // -----------------------------
-#ifdef ESP8266
-struct RtcUptimeData {
-  uint32_t magic;      // 0x53434C4B ("SCLK")
-  uint32_t uptimeSec;
-};
-#define RTC_UPTIME_BLOCK 65
-#endif
+
 
 void loadUptime() {
   totalUptimeSeconds = 0;
@@ -6669,14 +6759,19 @@ void loop() {
   if (isAPMode) {
     dnsServer.processNextRequest();
     if (credentialsExist()) {
-      if (apStartTime == 0) apStartTime = millis();  // Mark the start time once
+      if (WiFi.softAPgetStationNum() > 0) {
+        // A phone/PC is actively connected to the setup AP: postpone timeout reboot
+        apStartTime = millis();
+      } else {
+        if (apStartTime == 0) apStartTime = millis();  // Mark the start time once
 
-      // 3 Minutes = 180000 ms
-      if (millis() - apStartTime > 180000) {
-        Serial.println(F("[WIFI] AP Timeout: Saved credentials found. Rebooting to retry connection..."));
-        saveUptime(true);
-        delay(500);
-        ESP.restart();
+        // 3 Minutes = 180000 ms
+        if (millis() - apStartTime > 180000) {
+          Serial.println(F("[WIFI] AP Timeout: Saved credentials found. Rebooting to retry connection..."));
+          saveUptime(true);
+          delay(500);
+          ESP.restart();
+        }
       }
     } else {
       apStartTime = 0;

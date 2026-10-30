@@ -1,0 +1,13 @@
+ESPTimeCast™ Source-Available Software License
+Copyright (c) 2026 M-Factory. All rights reserved.
+
+SisterClock Custom Derivative
+Copyright (c) 2026 Devyn Fidel.
+
+Terms and Conditions:
+1. Permitted Use: This software is provided solely for personal, private, non-commercial use as a customized gift for personal enjoyment.
+2. Restrictions:
+   - Commercial distribution, resale, or commercial licensing is strictly prohibited.
+   - You may not use this software, firmware binaries, or associated materials in commercial products, fee-based services, or paid distributions.
+3. Disclaimer:
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY.

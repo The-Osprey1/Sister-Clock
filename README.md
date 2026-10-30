@@ -8,14 +8,16 @@
 
 While standard matrix clocks display time and weather, **SisterClock** is customized as a thoughtful, delightful gift:
 
-- **Mobile Customizer Experience:** When connecting with a smartphone, an instant hero customizer card lets her personalize time format (12h vs 24h military), select between 3 clock display looks, choose between 3 animated alarm alerts, switch to a clock-only (no date) mode, and adjust display glow with touch-friendly presets.
+- **Instant Pre-Flight Wi-Fi Setup:** During setup, the clock tests your Wi-Fi password against your router *before* saving. If there is a typo, it alerts you immediately with "Try Again" without disconnecting your phone. Once connected, it displays the clock's local IP address and offers a 1-tap "Open My Clock" link.
+- **Mobile Customizer Experience:** An instant hero customizer card lets her personalize time format (12h vs 24h military), select between 3 clock display looks, choose between 3 animated alarm alerts, switch to a clock-only (no date) mode, and adjust display glow with touch-friendly presets.
+- **Fast Mobile Performance:** Pre-compressed gzip payload in PROGMEM (reduced from 214 KB to 41 KB) loads in under 300ms over the ESP8266 hotspot.
 - **Sister Affirmations & Heartbeat Cheer:** Periodically surprises her with uplifting messages throughout the day (e.g., *"HAVE A WONDERFUL DAY, SIS! ❤️"*, *"YOU MAKE THE WORLD BRIGHTER! ✨"*, *"REMEMBER TO DRINK WATER & SMILE :)"*, *"LOVE YOU TO THE MOON & BACK! ❤️"*).
 - **Custom Love Notes & Messages:** Send real-time messages directly to her desk or nightstand from the Web UI or via simple HTTP requests.
 - **Cute Matrix Glyphs:** Typing `<3` or `[LOVE]` automatically renders an animated glowing heart on the LED matrix! Also supports `[STAR]`, `[SMILE]`, `[MOON]`, and `[BELL]`.
 - **Nighttime Auto-Dimming:** Dims to an ultra-soft glow after hours (or powers down completely) so it never disturbs her sleep.
 - **Birthday & Event Countdowns:** Built-in countdown mode with cake/star icons for her birthday or special milestones.
 - **100% Clean Gift Build:** All upstream donation popups, BuyMeACoffee nag screens, and telemetry have been completely removed.
-- **Plug-and-Play Setup:** Self-contained captive portal hotspot (`SisterClock-Setup`) with friendly, zero-jargon configuration.
+- **Zero-Flash-Wear Uptime:** Buffers accumulated runtime in ESP8266 RTC user memory across resets, saving SPI flash from 52,000+ unnecessary writes per year.
 
 ---
 
@@ -77,7 +79,7 @@ For a short, sister-friendly walkthrough, see the [SisterClock Quick Guide](SIST
 
 ## 📶 First-Time Wi-Fi Setup
 
-1. **Power on SisterClock:** On first boot, the display shows a pulsing heart `<3` indicating setup mode.
+1. **Power on SisterClock:** On first boot, the display shows the animated `AP 📶` pairing glyphs indicating setup mode.
 2. **Connect to Hotspot:** On your smartphone or laptop, connect to the Wi-Fi network:
    - **SSID:** `SisterClock-Setup`
    - **Password:** `bestbrother`
@@ -87,7 +89,7 @@ For a short, sister-friendly walkthrough, see the [SisterClock Quick Guide](SIST
    - Enter your OpenWeatherMap API Key & City (optional, for live weather).
    - Choose 12-hour or 24-hour clock and temperature units (°F or °C).
    - Ensure **Sister Affirmations** is toggled ON.
-5. Click **Save & Reboot**. SisterClock connects to Wi-Fi, syncs NTP time, and scrolls its assigned local IP address!
+5. Click **Connect clock**. SisterClock tests the connection with your router, verifies the password, saves settings, and provides a direct link to open the clock!
 
 ---
 
@@ -117,25 +119,30 @@ curl "http://sisterclock.local/action?message=Good%20morning%20sis!%20%3C3&scrol
 ```
 SisterClock/
 ├── dist/
-│   └── firmware.bin          # Precompiled ready-to-flash binary (759 KB)
+│   └── firmware.bin          # Precompiled ready-to-flash binary (~611 KB)
 ├── firmware/
 │   ├── SisterClock.ino       # Main firmware source code
-│   ├── index_html.h          # Embedded responsive Web UI & styling
-│   ├── version.h             # Firmware identity and version
+│   ├── index_html.h          # Embedded responsive Web UI & styling (gzipped + readable)
+│   ├── version.h             # Firmware identity and version (v1.1.0-SisterClock)
 │   ├── mfactoryfont.h        # 8x8 font and dot matrix glyph table
 │   ├── alarm.h               # Alarm scheduler and logic
 │   ├── buzzer.h              # Piezo sound synthesizer
 │   ├── days_lookup.h         # Multilingual day of week strings
 │   ├── months_lookup.h       # Multilingual month strings
 │   └── tz_lookup.h           # IANA timezone database
+├── scripts/
+│   └── compress_html.py      # Automated deterministic HTML gzip compressor (mtime=0)
 ├── tests/
-│   └── test_sisterclock.py   # Automated pytest verification suite (10 tests)
+│   ├── test_sisterclock.py   # Automated pytest verification suite (36 tests)
+│   └── test_customizer.js    # Node.js DOM mock and UI handler test
 ├── web_installer/
 │   ├── index.html            # WebSerial browser installer
-│   └── manifest.json         # ESP Web Tools manifest
+│   ├── manifest.json         # ESP Web Tools manifest
+│   └── firmware.bin          # Self-contained installer binary
 ├── flash.ps1                 # Automated PowerShell flashing tool
 ├── flash.bat                 # Windows double-click flasher
 ├── platformio.ini            # PlatformIO build configuration
+├── LICENSE.txt               # Source-available non-commercial license
 ├── MAKERWORLD_BUILD_GUIDE.md # 3D printing & enclosure assembly guide
 ├── WIRING.md                 # Hardware pinout & wiring diagram
 └── README.md                 # Master documentation
@@ -144,4 +151,4 @@ SisterClock/
 ---
 
 ## ❤️ License
-Source headers identify upstream ESPTimeCast as personal, non-commercial use and refer to `LICENSE.txt`, which is not present here. Confirm the upstream license and redistribution permission before sharing releases.
+Upstream ESPTimeCast™ Copyright (c) 2026 M-Factory is source-available for personal, non-commercial use only. See [LICENSE.txt](LICENSE.txt) for terms governing personal, non-commercial gift use.
