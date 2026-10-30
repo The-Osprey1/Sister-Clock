@@ -488,3 +488,19 @@ def test_license_and_version_updated():
     with open(VERSION_FILE, 'r', encoding='utf-8') as f:
         ver = f.read()
     assert '1.1.0-SisterClock' in ver
+
+def test_wifi_timeout_and_same_minute_alarms_and_cors_hardened():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+    with open(HTML_FILE, 'r', encoding='utf-8') as f:
+        html = f.read()
+
+    # 15s Wi-Fi preflight timeout and 18s web polling window
+    assert 'millis() - wifiTestStartTime > 15000' in ino
+    assert 'Date.now() - pollStart < 18000' in html
+
+    # Multiple alarms in same minute tracking
+    assert 'alarmFiredThisMinute' in ino
+
+    # Restricted wildcard CORS: no global Access-Control-Allow-Origin: * on administrative endpoints
+    assert 'DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*")' not in ino

@@ -94,6 +94,7 @@ AlarmConfig alarmConfigs[MAX_ALARMS];
 bool alarmRinging = false;
 int alarmRingingIndex = -1;
 int alarmLastCheckedMinute = -1;
+bool alarmFiredThisMinute[MAX_ALARMS] = { false, false, false, false };
 int alarmPreviousDisplayMode = 0;
 bool alarmSavedDisplayOff = false;
 int alarmSavedBrightness = 7;
@@ -2258,9 +2259,8 @@ void setupWebServer() {
   const bool apSetupOnly = !credentialsExist();
   Serial.println(F("[WEBSERVER] Setting up web server..."));
 
-  // 1. Global CORS headers (Required for Chrome Extension)
-  // These headers allow the browser to verify the security policy for all routes.
-  DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*");
+  // Restricted CORS: only allowed for safe integration queries, disabled globally for security
+  // Global wildcard CORS disabled for administrative security
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-Source, X-OTA-Token");
 
@@ -6037,23 +6037,34 @@ void checkAlarmSchedule() {
     }
   }
 
-  if (!ntpSyncSuccessful) return;
+  if (!ntpSyncSuccessful) {
+    static unsigned long lastNtpWarn = 0;
+    if (millis() - lastNtpWarn > 60000) {
+      lastNtpWarn = millis();
+      Serial.println(F("[ALARM WARNING] Time not synchronized; alarms cannot fire until NTP syncs."));
+    }
+    return;
+  }
 
   time_t nowTime = time(nullptr);
   struct tm timeinfo;
   localtime_r(&nowTime, &timeinfo);
 
-  if (timeinfo.tm_min == alarmLastCheckedMinute) return;
-  alarmLastCheckedMinute = timeinfo.tm_min;
+  if (timeinfo.tm_min != alarmLastCheckedMinute) {
+    alarmLastCheckedMinute = timeinfo.tm_min;
+    for (int i = 0; i < MAX_ALARMS; i++) alarmFiredThisMinute[i] = false;
+  }
 
   if (alarmRinging) return;
 
   for (int i = 0; i < MAX_ALARMS; i++) {
     if (!alarmConfigs[i].enabled) continue;
+    if (alarmFiredThisMinute[i]) continue;
     if (!alarmConfigs[i].days[timeinfo.tm_wday]) continue;
     if (timeinfo.tm_hour == alarmConfigs[i].hour && timeinfo.tm_min == alarmConfigs[i].minute) {
+      alarmFiredThisMinute[i] = true;
       fireAlarm(i, -1, -1);
-      return;  // first match this minute wins; others wait for their next scheduled day
+      return;
     }
   }
 }
@@ -6684,7 +6695,7 @@ void loop() {
         wifiTestState = 3; // Success
         wifiTestRequested = false;
         Serial.printf(PSTR("[WIFI TEST] Connected from main loop! IP: %s\n"), wifiTestResultIP.c_str());
-      } else if (millis() - wifiTestStartTime > 8500) {
+      } else if (millis() - wifiTestStartTime > 15000) {
         wl_status_t st = WiFi.status();
         wifiTestState = 4; // Failed
         wifiTestError = (st == WL_NO_SSID_AVAIL) ? "Network not found. Please check the Wi-Fi name."
