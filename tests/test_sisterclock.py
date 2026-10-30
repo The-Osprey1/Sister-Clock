@@ -274,10 +274,12 @@ def test_ap_setup_banner_display():
     with open(INO_FILE, "r", encoding="utf-8") as f:
         content = f.read()
 
-    # Verify friendly scrolling setup banner in AP mode
-    assert 'CONNECT PHONE TO: SisterClock-Setup' in content
-    assert '192.168.4.1' in content
-    assert '\\x8F SETUP \\x8F' in content
+    # Verify simple animated wifi symbol from original repo in AP mode
+    assert 'apAnimTimer' in content
+    assert 'apAnimFrame' in content
+    assert '(char)169' in content
+    assert '(char)170' in content
+    assert '(char)171' in content
     assert 'dnsServer.processNextRequest();' in content
 
 def test_mobile_pwa_and_setup_button():
@@ -320,9 +322,9 @@ def test_captive_portal_and_ap_mode_robustness():
     assert 'uri.endsWith(".png")' in ino
     assert 'request->send(404, "text/plain", "Not found");' in ino
 
-    # AP loop helper banner must be reachable in isAPMode block
-    assert 'CONNECT PHONE TO: SisterClock-Setup' in ino
-    assert 'P.displayScroll' in ino
+    # AP mode animation must be reachable in isAPMode block
+    assert 'apAnimFrame' in ino
+    assert '(char)169' in ino
 
 def test_index_html_js_syntax_integrity():
     with open(HTML_FILE, "r", encoding="utf-8") as f:

@@ -6609,80 +6609,38 @@ void loop() {
         delay(500);
         ESP.restart();
       }
-      // Temporary AP fallback animation (when home router is offline)
-      static unsigned long apAnimTimer = 0;
-      static int apAnimFrame = 0;
-      unsigned long now = millis();
-      if (now - apAnimTimer > 750) {
-        apAnimTimer = now;
-        apAnimFrame++;
-      }
-      P.setTextAlignment(PA_CENTER);
-      switch (apAnimFrame % 3) {
-        case 0:
-          {
-            char buf[] = { (char)0x8F, ' ', (char)169, '\0' };
-            P.print(buf);
-            break;
-          }
-        case 1:
-          {
-            char buf[] = { (char)0x8F, ' ', (char)170, '\0' };
-            P.print(buf);
-            break;
-          }
-        case 2:
-          {
-            char buf[] = { (char)0x8F, ' ', (char)171, '\0' };
-            P.print(buf);
-            break;
-          }
-      }
-      yield();
-      return;
-    } else {
-      // AP SETUP MODE HELPER BANNER (First boot / Setup mode)
-      static bool apScrollInit = false;
-      static unsigned long apPauseStart = 0;
-      static bool apInPause = false;
-      static unsigned long lastHeartToggle = 0;
-      static bool heartToggle = false;
-      const unsigned long AP_PAUSE_MS = 2000;
-
-      if (!apScrollInit) {
-        P.displayReset();
-        P.setCharSpacing(1);
-        textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
-        P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
-        apScrollInit = true;
-        apInPause = false;
-      }
-
-      if (apInPause) {
-        if (millis() - apPauseStart >= AP_PAUSE_MS) {
-          apInPause = false;
-          textEffect_t actualScrollDirection = getEffectiveScrollDirection(PA_SCROLL_LEFT, flipDisplay);
-          P.displayScroll("CONNECT PHONE TO: SisterClock-Setup \x8F 192.168.4.1", PA_CENTER, actualScrollDirection, 65);
-        } else {
-          if (millis() - lastHeartToggle > 400) {
-            lastHeartToggle = millis();
-            heartToggle = !heartToggle;
-            P.setTextAlignment(PA_CENTER);
-            P.print(heartToggle ? "\x8F SETUP \x8F" : "  SETUP  ");
-          }
-        }
-      } else {
-        if (P.displayAnimate()) {
-          apInPause = true;
-          apPauseStart = millis();
-          P.displayClear();
-          P.setTextAlignment(PA_CENTER);
-          P.print("\x8F SETUP \x8F");
-        }
-      }
-      yield();
-      return;
     }
+    // AP Mode animation from original repo
+    static unsigned long apAnimTimer = 0;
+    static int apAnimFrame = 0;
+    unsigned long now = millis();
+    if (now - apAnimTimer > 750) {
+      apAnimTimer = now;
+      apAnimFrame++;
+    }
+    P.setTextAlignment(PA_CENTER);
+    switch (apAnimFrame % 3) {
+      case 0:
+        {
+          char buf[] = { 5, ' ', (char)169, '\0' };
+          P.print(buf);
+          break;
+        }
+      case 1:
+        {
+          char buf[] = { 5, ' ', (char)170, '\0' };
+          P.print(buf);
+          break;
+        }
+      case 2:
+        {
+          char buf[] = { 5, ' ', (char)171, '\0' };
+          P.print(buf);
+          break;
+        }
+    }
+    yield();
+    return;
   }
 
   static bool colonVisible = true;
