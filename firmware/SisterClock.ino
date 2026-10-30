@@ -330,6 +330,15 @@ bool weatherFetched = false;
 bool weatherFetchInitiated = false;
 bool isAPMode = false;
 unsigned long apStartTime = 0;
+
+// Non-blocking Wi-Fi Pre-flight Test State Machine
+bool wifiTestRequested = false;
+String wifiTestSsid = "";
+String wifiTestPass = "";
+int wifiTestState = 0;  // 0 = idle, 1 = queued, 2 = testing, 3 = success, 4 = failed
+unsigned long wifiTestStartTime = 0;
+String wifiTestResultIP = "";
+String wifiTestError = "";
 char tempSymbol = '\006';
 bool shouldFetchWeatherNow = false;
 String currentCityName = "";
@@ -3570,7 +3579,7 @@ void setupWebServer() {
 
     server.on("/test_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!request->hasParam("ssid", true)) {
-      request->send(400, "application/json", "{\"success\":false,\"error\":\"SSID is required\"}");
+      request->send(400, "application/json", "{\"status\":\"failed\",\"error\":\"SSID is required\"}");
       return;
     }
     String testSsid = request->getParam("ssid", true)->value();
@@ -3578,54 +3587,39 @@ void setupWebServer() {
     testSsid.trim();
 
     if (testSsid.length() == 0) {
-      request->send(400, "application/json", "{\"success\":false,\"error\":\"Wi-Fi network name cannot be empty\"}");
+      request->send(400, "application/json", "{\"status\":\"failed\",\"error\":\"Wi-Fi network name cannot be empty\"}");
       return;
     }
 
-    Serial.printf(PSTR("[WIFI TEST] Preflight testing connection to SSID: %s\n"), testSsid.c_str());
+    Serial.printf(PSTR("[WIFI TEST] Queuing non-blocking preflight check for: %s\n"), testSsid.c_str());
+    wifiTestSsid = testSsid;
+    wifiTestPass = testPass;
+    wifiTestResultIP = "";
+    wifiTestError = "";
+    wifiTestStartTime = millis();
+    wifiTestState = 1;  // 1 = queued for main loop
+    wifiTestRequested = true;
 
-    // Keep softAP active by using WIFI_AP_STA mode during the check
-    WiFi.mode(WIFI_AP_STA);
-    WiFi.begin(testSsid.c_str(), testPass.c_str());
+    request->send(200, "application/json", "{\"status\":\"pending\"}");
+  });
 
-    unsigned long startAttempt = millis();
-    bool connected = false;
-    while (millis() - startAttempt < 8500) {
-      if (WiFi.status() == WL_CONNECTED) {
-        connected = true;
-        break;
-      }
-      delay(150);
-      yield();
-    }
-
-    if (connected) {
-      String ip = WiFi.localIP().toString();
-      Serial.printf(PSTR("[WIFI TEST] Verified! Local IP: %s\n"), ip.c_str());
-      JsonDocument res;
-      res["success"] = true;
-      res["ip"] = ip;
-      res["message"] = "Connected successfully!";
-      String out;
-      serializeJson(res, out);
-      request->send(200, "application/json", out);
+  server.on("/test_wifi_status", HTTP_GET, [](AsyncWebServerRequest *request) {
+    JsonDocument doc;
+    if (wifiTestState == 3) {
+      doc["status"] = "success";
+      doc["ip"] = wifiTestResultIP;
+      doc["message"] = "Connected successfully!";
+    } else if (wifiTestState == 4) {
+      doc["status"] = "failed";
+      doc["error"] = wifiTestError;
+    } else if (wifiTestState == 1 || wifiTestState == 2) {
+      doc["status"] = "pending";
     } else {
-      wl_status_t st = WiFi.status();
-      Serial.printf(PSTR("[WIFI TEST] Failed with status: %d\n"), (int)st);
-      WiFi.disconnect(false);
-      WiFi.mode(WIFI_AP);
-
-      String errMsg = "Could not connect to Wi-Fi. Please check your password.";
-      if (st == WL_NO_SSID_AVAIL) {
-        errMsg = "Network not found. Please check the Wi-Fi name.";
-      }
-      JsonDocument res;
-      res["success"] = false;
-      res["error"] = errMsg;
-      String out;
-      serializeJson(res, out);
-      request->send(200, "application/json", out);
+      doc["status"] = "idle";
     }
+    String out;
+    serializeJson(doc, out);
+    request->send(200, "application/json", out);
   });
 
   server.on("/reset_wifi", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -6667,6 +6661,35 @@ void loop() {
     }
   }
 
+  // --- Non-blocking Wi-Fi Pre-flight Test Handler ---
+  if (wifiTestRequested) {
+    if (wifiTestState == 1) {
+      // Step 1: Start attempt from main loop while keeping softAP active
+      WiFi.mode(WIFI_AP_STA);
+      WiFi.begin(wifiTestSsid.c_str(), wifiTestPass.c_str());
+      wifiTestState = 2; // In progress
+      wifiTestStartTime = millis();
+      Serial.println(F("[WIFI TEST] Started non-blocking attempt from main loop"));
+    } else if (wifiTestState == 2) {
+      // Step 2: Poll status on each loop pass
+      if (WiFi.status() == WL_CONNECTED) {
+        wifiTestResultIP = WiFi.localIP().toString();
+        wifiTestState = 3; // Success
+        wifiTestRequested = false;
+        Serial.printf(PSTR("[WIFI TEST] Connected from main loop! IP: %s\n"), wifiTestResultIP.c_str());
+      } else if (millis() - wifiTestStartTime > 8500) {
+        wl_status_t st = WiFi.status();
+        wifiTestState = 4; // Failed
+        wifiTestError = (st == WL_NO_SSID_AVAIL) ? "Network not found. Please check the Wi-Fi name."
+                                                 : "Could not connect to Wi-Fi. Please check your password.";
+        wifiTestRequested = false;
+        WiFi.disconnect(false);
+        WiFi.mode(WIFI_AP);
+        Serial.printf(PSTR("[WIFI TEST] Timed out or failed from main loop (status %d)\n"), (int)st);
+      }
+    }
+  }
+
   // --- WIFI RECONNECTION ---
   static unsigned long lastReconnectAttempt = 0;
   static unsigned long reconnectInterval = 5000;
@@ -6675,7 +6698,7 @@ void loop() {
   static unsigned long staAttemptStart = 0;
   const unsigned long staAttemptTimeout = 8000;  // short bounded window, not the full interval
 
-  if (!isRebooting && (!isAPMode || credentialsExist())) {
+  if (!wifiTestRequested && !isRebooting && (!isAPMode || credentialsExist())) {
     bool apClientActive = isAPMode && WiFi.softAPgetStationNum() > 0;
 
     if (!apClientActive) {

@@ -466,12 +466,25 @@ def test_test_wifi_endpoint_present():
         html = f.read()
 
     assert 'server.on("/test_wifi"' in ino
+    assert 'server.on("/test_wifi_status"' in ino
+    assert 'wifiTestRequested' in ino
     assert 'WIFI_AP_STA' in ino
     assert '/test_wifi' in html
+    assert '/test_wifi_status' in html
+
+    # Non-blocking assertion: /test_wifi request handler must not call delay or yield
+    test_handler = ino[ino.find('/test_wifi", HTTP_POST'):ino.find('/test_wifi_status')]
+    assert 'delay(' not in test_handler, "/test_wifi must be non-blocking; delay() forbidden in async handler"
+    assert 'yield();' not in test_handler, "/test_wifi must be non-blocking; yield() forbidden in async handler"
 
 def test_license_and_version_updated():
     license_file = os.path.join(BASE_DIR, "LICENSE.txt")
     assert os.path.isfile(license_file), "LICENSE.txt must exist"
+    with open(license_file, 'r', encoding='utf-8') as f:
+        lic = f.read()
+    assert 'Copyright (c) 2026 M-Factory (mfactory-osaka)' in lic
+    assert 'LICENSE: Source-available for personal, non-commercial use only.' in lic
+
     with open(VERSION_FILE, 'r', encoding='utf-8') as f:
         ver = f.read()
     assert '1.1.0-SisterClock' in ver
