@@ -2200,6 +2200,42 @@ struct RtcUptimeData {
 #define RTC_UPTIME_BLOCK 65
 #endif
 
+void performFactoryReset() {
+  Serial.println(F("[RESET] Factory reset requested, initiating cleanup..."));
+  delay(200);
+
+  // --- Remove configuration, backup, and uptime files ---
+  const char *filesToRemove[] = { "/config.json", "/config.bak", "/config.tmp", "/uptime.dat", "/index.html" };
+  for (auto &file : filesToRemove) {
+    if (LittleFS.exists(file)) {
+      if (LittleFS.remove(file)) {
+        Serial.printf(PSTR("[RESET] Deleted %s\n"), file);
+      } else {
+        Serial.printf(PSTR("[RESET] ERROR deleting %s\n"), file);
+      }
+    } else {
+      Serial.printf(PSTR("[RESET] %s not found, skipping delete.\n"), file);
+    }
+  }
+
+#ifdef ESP8266
+  // Reset RTC uptime memory
+  RtcUptimeData rtcData = {0, 0};
+  ESP.rtcUserMemoryWrite(RTC_UPTIME_BLOCK, (uint32_t *)&rtcData, sizeof(rtcData));
+#endif
+
+// --- Clear Wi-Fi credentials ---
+#if defined(ESP8266)
+  WiFi.disconnect(true);  // true = wipe credentials
+#elif defined(ESP32)
+  WiFi.disconnect(true, true);  // (erase=true, wifioff=true)
+#endif
+
+  Serial.println(F("[RESET] Factory defaults restored. Rebooting..."));
+  delay(500);
+  ESP.restart();
+}
+
 bool isValidConfigKey(const String &k) {
   static const char *const VALID_KEYS[] = {
     "brightness", "regularBrightness", "clockDuration", "weatherDuration",
@@ -3707,39 +3743,8 @@ server.on("/factory_reset", HTTP_GET, [](AsyncWebServerRequest *request) {
 
     // Use onDisconnect() to ensure the HTTP response is fully sent before the disruptive actions
     request->onDisconnect([]() {
-      // Small delay to ensure the response buffer is flushed before file ops
       delay(500);
-
-      // --- Remove configuration, backup, and uptime files ---
-      const char *filesToRemove[] = { "/config.json", "/config.bak", "/config.tmp", "/uptime.dat", "/index.html" };
-      for (auto &file : filesToRemove) {
-        if (LittleFS.exists(file)) {
-          if (LittleFS.remove(file)) {
-            Serial.printf(PSTR("[RESET] Deleted %s\n"), file);
-          } else {
-            Serial.printf(PSTR("[RESET] ERROR deleting %s\n"), file);
-          }
-        } else {
-          Serial.printf(PSTR("[RESET] %s not found, skipping delete.\n"), file);
-        }
-      }
-
-#ifdef ESP8266
-      // Reset RTC uptime memory
-      RtcUptimeData rtcData = {0, 0};
-      ESP.rtcUserMemoryWrite(RTC_UPTIME_BLOCK, (uint32_t *)&rtcData, sizeof(rtcData));
-#endif
-
-// --- Clear Wi-Fi credentials ---
-#if defined(ESP8266)
-      WiFi.disconnect(true);  // true = wipe credentials
-#elif defined(ESP32)
-        WiFi.disconnect(true, true);  // (erase=true, wifioff=true)
-#endif
-
-      Serial.println(F("[RESET] Factory defaults restored. Rebooting..."));
-      delay(500);
-      ESP.restart();
+      performFactoryReset();
     });
   });
 
@@ -6664,15 +6669,17 @@ void loop() {
   // --- Non-blocking Wi-Fi Pre-flight Test Handler ---
   if (wifiTestRequested) {
     if (wifiTestState == 1) {
-      // Step 1: Start attempt from main loop while keeping softAP active
-      WiFi.mode(WIFI_AP_STA);
+      // Step 1: Disconnect any existing STA connection and start attempt from main loop while keeping softAP active
+      WiFi.disconnect(false);
+      WiFi.mode(isAPMode ? WIFI_AP_STA : WIFI_AP_STA);
       WiFi.begin(wifiTestSsid.c_str(), wifiTestPass.c_str());
       wifiTestState = 2; // In progress
       wifiTestStartTime = millis();
-      Serial.println(F("[WIFI TEST] Started non-blocking attempt from main loop"));
+      Serial.printf(PSTR("[WIFI TEST] Started non-blocking attempt for: %s\n"), wifiTestSsid.c_str());
     } else if (wifiTestState == 2) {
       // Step 2: Poll status on each loop pass
-      if (WiFi.status() == WL_CONNECTED) {
+      // Ensure at least 600ms have elapsed so any previous connection teardown completes before accepting WL_CONNECTED
+      if (millis() - wifiTestStartTime > 600 && WiFi.status() == WL_CONNECTED) {
         wifiTestResultIP = WiFi.localIP().toString();
         wifiTestState = 3; // Success
         wifiTestRequested = false;
@@ -6684,9 +6691,61 @@ void loop() {
                                                  : "Could not connect to Wi-Fi. Please check your password.";
         wifiTestRequested = false;
         WiFi.disconnect(false);
-        WiFi.mode(WIFI_AP);
+        WiFi.mode(isAPMode ? WIFI_AP : WIFI_STA);
         Serial.printf(PSTR("[WIFI TEST] Timed out or failed from main loop (status %d)\n"), (int)st);
       }
+    }
+  }
+
+  // --- Serial Command Interface (for automated testing and diagnostics over USB) ---
+  if (Serial.available()) {
+    String cmd = Serial.readStringUntil('\n');
+    cmd.trim();
+    if (cmd == F("FACTORY_RESET")) {
+      performFactoryReset();
+    } else if (cmd.startsWith(F("TEST_WIFI\t")) || cmd.startsWith(F("TEST_WIFI "))) {
+      char delim = cmd.indexOf('\t') != -1 ? '\t' : ' ';
+      int first = cmd.indexOf(delim);
+      int second = cmd.indexOf(delim, first + 1);
+      if (second > first) {
+        wifiTestSsid = cmd.substring(first + 1, second);
+        wifiTestPass = cmd.substring(second + 1);
+      } else {
+        wifiTestSsid = cmd.substring(first + 1);
+        wifiTestPass = "";
+      }
+      wifiTestResultIP = "";
+      wifiTestError = "";
+      wifiTestState = 1;
+      wifiTestRequested = true;
+      Serial.printf(PSTR("[SERIAL CMD] Queued test for SSID: '%s'\n"), wifiTestSsid.c_str());
+    } else if (cmd == F("WIFI_STATUS")) {
+      Serial.printf(PSTR("[WIFI STATUS] state=%d, req=%d, IP=%s, err=%s, status=%d\n"),
+        wifiTestState, (int)wifiTestRequested, wifiTestResultIP.c_str(), wifiTestError.c_str(), (int)WiFi.status());
+    } else if (cmd.startsWith(F("SAVE_WIFI\t")) || cmd.startsWith(F("SAVE_WIFI "))) {
+      char delim = cmd.indexOf('\t') != -1 ? '\t' : ' ';
+      int first = cmd.indexOf(delim);
+      int second = cmd.indexOf(delim, first + 1);
+      String newSsid = "";
+      String newPass = "";
+      if (second > first) {
+        newSsid = cmd.substring(first + 1, second);
+        newPass = cmd.substring(second + 1);
+      } else {
+        newSsid = cmd.substring(first + 1);
+      }
+      JsonDocument doc;
+      File f = LittleFS.open("/config.json", "r");
+      if (f) {
+        deserializeJson(doc, f);
+        f.close();
+      }
+      doc["ssid"] = newSsid;
+      doc["password"] = newPass;
+      writeConfigSafely(doc);
+      Serial.printf(PSTR("[SERIAL CMD] Saved Wi-Fi for SSID: %s. Rebooting...\n"), newSsid.c_str());
+      delay(300);
+      ESP.restart();
     }
   }
 
