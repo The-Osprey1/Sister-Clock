@@ -10,9 +10,9 @@ While standard matrix clocks display time and weather, **SisterClock** is custom
 
 - **Instant Pre-Flight Wi-Fi Setup:** During setup, the clock tests your Wi-Fi password against your router *before* saving. If there is a typo, it alerts you immediately with "Try Again" without disconnecting your phone. Once connected, it displays the clock's local IP address and offers a 1-tap "Open My Clock" link.
 - **Mobile Customizer Experience:** An instant hero customizer card lets her personalize time format (12h vs 24h military), select between 3 clock display looks, choose between 3 animated alarm alerts, switch to a clock-only (no date) mode, and adjust display glow with touch-friendly presets.
-- **Fast Mobile Performance:** Pre-compressed gzip payload in PROGMEM (reduced from 214 KB to 41 KB) loads in under 300ms over the ESP8266 hotspot.
+- **Fast Mobile Performance & Instant App Launch:** Pre-compressed gzip payload in PROGMEM (reduced from 219 KB to 41 KB) loads in ~1s without blank screens. All TCP sockets close immediately to prevent socket exhaustion, and initialization runs asynchronously.
 - **Sister Affirmations & Heartbeat Cheer:** Periodically surprises her with uplifting messages throughout the day (e.g., *"HAVE A WONDERFUL DAY, SIS! ❤️"*, *"YOU MAKE THE WORLD BRIGHTER! ✨"*, *"REMEMBER TO DRINK WATER & SMILE :)"*, *"LOVE YOU TO THE MOON & BACK! ❤️"*).
-- **Custom Love Notes & Messages:** Send real-time messages directly to her desk or nightstand from the Web UI or via simple HTTP requests.
+- **Custom Love Notes & Messages:** Send real-time messages directly to her desk or nightstand from the Web UI or via simple HTTP requests. Messages display smoothly for 2 scrolls (or 12 seconds) as a clean one-time alert without looping or flash wear.
 - **Cute Matrix Glyphs:** Typing `<3` or `[LOVE]` automatically renders an animated glowing heart on the LED matrix! Also supports `[STAR]`, `[SMILE]`, `[MOON]`, and `[BELL]`.
 - **Nighttime Auto-Dimming:** Dims to an ultra-soft glow after hours (or powers down completely) so it never disturbs her sleep.
 - **Birthday & Event Countdowns:** Built-in countdown mode with cake/star icons for her birthday or special milestones.
@@ -119,7 +119,7 @@ curl "http://sisterclock.local/action?message=Good%20morning%20sis!%20%3C3&scrol
 ```
 SisterClock/
 ├── dist/
-│   └── firmware.bin          # Precompiled ready-to-flash binary (~611 KB)
+│   └── firmware.bin          # Precompiled ready-to-flash binary (~613 KB)
 ├── firmware/
 │   ├── SisterClock.ino       # Main firmware source code
 │   ├── index_html.h          # Embedded responsive Web UI & styling (gzipped + readable)
@@ -133,7 +133,7 @@ SisterClock/
 ├── scripts/
 │   └── compress_html.py      # Automated deterministic HTML gzip compressor (mtime=0)
 ├── tests/
-│   ├── test_sisterclock.py   # Automated pytest verification suite (36 tests)
+│   ├── test_sisterclock.py   # Automated pytest verification suite (39 tests)
 │   └── test_customizer.js    # Node.js DOM mock and UI handler test
 ├── web_installer/
 │   ├── index.html            # WebSerial browser installer
