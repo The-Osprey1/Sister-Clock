@@ -1,5 +1,6 @@
 import os
 import re
+import gzip
 import pytest
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -504,3 +505,21 @@ def test_wifi_timeout_and_same_minute_alarms_and_cors_hardened():
 
     # Restricted wildcard CORS: no global Access-Control-Allow-Origin: * on administrative endpoints
     assert 'DefaultHeaders::Instance().addHeader("Access-Control-Allow-Origin", "*")' not in ino
+
+def test_compressed_html_matches_uncompressed():
+    with open(HTML_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = r'const char index_html\[\] PROGMEM = R"rawliteral\(([\s\S]*?)\)rawliteral";'
+    match = re.search(pattern, content)
+    assert match, "Could not find uncompressed index_html rawliteral"
+    html_text = match.group(1)
+    expected_gz = gzip.compress(html_text.encode("utf-8"), compresslevel=9, mtime=0)
+
+    gz_pattern = r'const uint8_t index_html_gz\[\] PROGMEM = \{([\s\S]*?)\};'
+    gz_match = re.search(gz_pattern, content)
+    assert gz_match, "Could not find index_html_gz array"
+    hex_str = gz_match.group(1).replace("\n", "").replace(" ", "")
+    byte_vals = bytes(int(x, 16) for x in hex_str.split(",") if x.startswith("0x"))
+
+    assert byte_vals == expected_gz, "index_html_gz is out of sync with index_html! Run python scripts/compress_html.py"
