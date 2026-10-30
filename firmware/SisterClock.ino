@@ -1652,6 +1652,12 @@ void handleCustomMessageLogic(AsyncWebServerRequest *request) {
     int rawScrolls = request->hasArg("scrolltimes") ? request->arg("scrolltimes").toInt() : (request->hasArg("scrolls") ? request->arg("scrolls").toInt() : (request->hasArg("scroll_times") ? request->arg("scroll_times").toInt() : 0));
     int newMessageScrollTimes = constrain(rawScrolls, 0, 100);
 
+    // Sensible defaults for notifications/actions without explicit bounds:
+    if (!isClearRequest && newMessageDisplaySeconds == 0 && newMessageScrollTimes == 0) {
+      newMessageScrollTimes = 2;
+      newMessageDisplaySeconds = 12;
+    }
+
     // 4. Speed & Big Numbers
     bool newMessageBigNumbers = (request->arg("bignumbers") == "1");
     int rawSpeed = request->hasArg("speed") ? request->arg("speed").toInt() : GENERAL_SCROLL_SPEED;
@@ -1789,15 +1795,8 @@ void handleCustomMessageLogic(AsyncWebServerRequest *request) {
     }
 
     // --- STORE & ACTIVATE ---
-    if (isFromAPI) {
-      filtered.toCharArray(customMessage, sizeof(customMessage));
-      messageScrollSpeed = localSpeed;
-    } else {
-      filtered.toCharArray(customMessage, sizeof(customMessage));
-      strlcpy(lastPersistentMessage, customMessage, sizeof(lastPersistentMessage));
-      messageScrollSpeed = GENERAL_SCROLL_SPEED;
-      saveCustomMessageToConfig(lastPersistentMessage);
-    }
+    filtered.toCharArray(customMessage, sizeof(customMessage));
+    messageScrollSpeed = isFromAPI ? localSpeed : GENERAL_SCROLL_SPEED;
 
     allowInterrupt = incomingAllowInterrupt;
     displayMode = 6;
@@ -2263,6 +2262,7 @@ void setupWebServer() {
   // Global wildcard CORS disabled for administrative security
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
   DefaultHeaders::Instance().addHeader("Access-Control-Allow-Headers", "Content-Type, X-Source, X-OTA-Token");
+  DefaultHeaders::Instance().addHeader("Connection", "close");
 
   // Root handler with BOTH CORS and Cache-Prevention
   // Root & index.html handlers with BOTH CORS and Cache-Prevention
@@ -2272,6 +2272,7 @@ void setupWebServer() {
     response->addHeader("Cache-Control", "no-cache, no-store, must-revalidate");
     response->addHeader("Pragma", "no-cache");
     response->addHeader("Expires", "0");
+    response->addHeader("Connection", "close");
     response->addHeader("Access-Control-Allow-Origin", "*");
     request->send(response);
   };
@@ -2558,7 +2559,9 @@ void setupWebServer() {
     String json = "{\"isAP\": ";
     json += (isAPMode) ? "true" : "false";
     json += "}";
-    request->send(200, "application/json", json);
+    AsyncWebServerResponse *response = request->beginResponse(200, "application/json", json);
+    response->addHeader("Connection", "close");
+    request->send(response);
   });
 
   auto setHandler = [](AsyncWebServerRequest *request) {
@@ -8481,26 +8484,22 @@ void loop() {
 
     if (timedOut || scrollsComplete || cyclesComplete) {
       allowInterrupt = true;
-      if (strlen(lastPersistentMessage) > 0) {
-        strncpy(customMessage, lastPersistentMessage, sizeof(customMessage));
-        messageScrollSpeed = GENERAL_SCROLL_SPEED;
-      } else {
-        customMessage[0] = '\0';
-      }
+      customMessage[0] = '\0';
       currentScrollCount = 0;
       messageStartTime = 0;
       currentDisplayCycleCount = 0;
       messageDisplaySeconds = 0;
       messageScrollTimes = 0;
       prevDisplayMode = 6;  // Set for Clock scroll-in
-      advanceDisplayMode();
+      clockScrollDone = false;
+      advanceDisplayMode(true);
       yield();
       return;
     }
 
     // --- BRANCH A: STATIC (0-32 pixels) ---
     if (totalPixelWidth <= 32) {
-      unsigned long durationMs = (messageDisplaySeconds > 0) ? (messageDisplaySeconds * 1000UL) : weatherDuration;
+      unsigned long durationMs = (messageDisplaySeconds > 0) ? (messageDisplaySeconds * 1000UL) : 12000UL;
 
       // 1. Initial Centered Display
       P.setTextAlignment(PA_CENTER);
@@ -8519,36 +8518,17 @@ void loop() {
         yield();
       }
 
-      // 2. THE MANUAL SHIFT (Create 4-5px of pure black)
-      // We only want to "push" the text off-screen if this is the VERY LAST cycle
-      bool isLastCycle = (messageScrollTimes > 0 && (currentDisplayCycleCount + 1 >= messageScrollTimes))
-                         || (messageScrollTimes == 0);
-
-      if ((totalPixelWidth >= 27 || msgInvert) && isLastCycle && rotationEnabled) {
-        // Shift the internal pixel buffer 5 times
-        for (uint8_t i = 0; i < 5; i++) {
-          if (displayMode != 6) return;
-          if (flipDisplay) {
-            P.getGraphicObject()->transform(MD_MAX72XX::TSR);  // shift right
-          } else {
-            P.getGraphicObject()->transform(MD_MAX72XX::TSL);  // shift left
-          }
-          unsigned long t = millis();
-          while (millis() - t < (unsigned long)messageScrollSpeed) {
-            buzzerLoop();
-            yield();
-          }
-        }
-      }
-
-      // 3. Handover to Clock
-      if (messageScrollTimes > 0) {
-        currentDisplayCycleCount++;
-      } else {
-        advanceDisplayMode();
-        prevDisplayMode = 6;
-        clockScrollDone = false;
-      }
+      // 2. Handover to Clock (clean finish, clear message, no chopping glitch)
+      allowInterrupt = true;
+      customMessage[0] = '\0';
+      messageStartTime = 0;
+      currentScrollCount = 0;
+      currentDisplayCycleCount = 0;
+      messageDisplaySeconds = 0;
+      messageScrollTimes = 0;
+      prevDisplayMode = 6;
+      clockScrollDone = false;
+      advanceDisplayMode(true);
       yield();
       return;
     }
@@ -8615,9 +8595,21 @@ void loop() {
 
     currentScrollCount++;
 
-    if (messageDisplaySeconds == 0 && messageScrollTimes == 0) {
+    bool shouldFinish = (messageScrollTimes > 0 && currentScrollCount >= messageScrollTimes)
+                     || (messageDisplaySeconds > 0 && (millis() - messageStartTime) >= (messageDisplaySeconds * 1000UL))
+                     || (currentScrollCount >= 2);
+
+    if (shouldFinish) {
+      allowInterrupt = true;
+      customMessage[0] = '\0';
+      messageStartTime = 0;
+      currentScrollCount = 0;
+      currentDisplayCycleCount = 0;
+      messageDisplaySeconds = 0;
+      messageScrollTimes = 0;
       prevDisplayMode = 6;
-      advanceDisplayMode();
+      clockScrollDone = false;
+      advanceDisplayMode(true);
     }
     yield();
     return;

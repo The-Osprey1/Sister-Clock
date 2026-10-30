@@ -523,3 +523,27 @@ def test_compressed_html_matches_uncompressed():
     byte_vals = bytes(int(x, 16) for x in hex_str.split(",") if x.startswith("0x"))
 
     assert byte_vals == expected_gz, "index_html_gz is out of sync with index_html! Run python scripts/compress_html.py"
+
+def test_custom_message_spam_fix_and_web_ui_responsiveness():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+    with open(HTML_FILE, 'r', encoding='utf-8') as f:
+        html = f.read()
+
+    # Webserver connection closure to prevent lwIP socket exhaustion
+    assert 'DefaultHeaders::Instance().addHeader("Connection", "close")' in ino
+    assert 'response->addHeader("Connection", "close")' in ino
+
+    # Custom message bounds & clean non-looping completion
+    assert 'newMessageScrollTimes = 2;' in ino
+    assert 'newMessageDisplaySeconds = 12;' in ino
+    assert r"customMessage[0] = '\0';" in ino
+
+    # Web UI: no initial black screen / invisible body
+    assert 'opacity: 0;' not in html.split('body {')[1].split('}')[0]
+    assert 'visibility: hidden;' not in html.split('body {')[1].split('}')[0]
+
+    # Web UI: DOMContentLoaded fast boot and scrolls=2&seconds=12
+    assert 'initSisterClockApp' in html
+    assert 'DOMContentLoaded' in html
+    assert 'scrolls=2&seconds=12' in html
