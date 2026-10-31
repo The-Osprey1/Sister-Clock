@@ -8597,7 +8597,7 @@ void loop() {
 
     bool shouldFinish = (messageScrollTimes > 0 && currentScrollCount >= messageScrollTimes)
                      || (messageDisplaySeconds > 0 && (millis() - messageStartTime) >= (messageDisplaySeconds * 1000UL))
-                     || (currentScrollCount >= 2);
+                     || (messageScrollTimes == 0 && messageDisplaySeconds == 0 && currentScrollCount >= 2);
 
     if (shouldFinish) {
       allowInterrupt = true;

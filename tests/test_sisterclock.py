@@ -514,7 +514,6 @@ def test_compressed_html_matches_uncompressed():
     match = re.search(pattern, content)
     assert match, "Could not find uncompressed index_html rawliteral"
     html_text = match.group(1)
-    expected_gz = gzip.compress(html_text.encode("utf-8"), compresslevel=9, mtime=0)
 
     gz_pattern = r'const uint8_t index_html_gz\[\] PROGMEM = \{([\s\S]*?)\};'
     gz_match = re.search(gz_pattern, content)
@@ -522,7 +521,10 @@ def test_compressed_html_matches_uncompressed():
     hex_str = gz_match.group(1).replace("\n", "").replace(" ", "")
     byte_vals = bytes(int(x, 16) for x in hex_str.split(",") if x.startswith("0x"))
 
-    assert byte_vals == expected_gz, "index_html_gz is out of sync with index_html! Run python scripts/compress_html.py"
+    # Compare what the clock serves, not the exact compressed bytes: gzip output differs
+    # slightly between operating systems and Python versions.
+    served = gzip.decompress(byte_vals).decode("utf-8")
+    assert served == html_text, "index_html_gz is out of sync with index_html! Run python scripts/compress_html.py"
 
 def test_custom_message_spam_fix_and_web_ui_responsiveness():
     with open(INO_FILE, 'r', encoding='utf-8') as f:
@@ -543,7 +545,31 @@ def test_custom_message_spam_fix_and_web_ui_responsiveness():
     assert 'opacity: 0;' not in html.split('body {')[1].split('}')[0]
     assert 'visibility: hidden;' not in html.split('body {')[1].split('}')[0]
 
-    # Web UI: DOMContentLoaded fast boot and scrolls=2&seconds=12
+    # Web UI: DOMContentLoaded fast boot; notes scroll twice (no time cap, so long notes are not cut short)
     assert 'initSisterClockApp' in html
     assert 'DOMContentLoaded' in html
-    assert 'scrolls=2&seconds=12' in html
+    assert 'scrolls=2&seconds=0' in html
+
+
+def test_message_scroll_count_and_setup_text_safety():
+    with open(INO_FILE, 'r', encoding='utf-8') as f:
+        ino = f.read()
+    with open(HTML_FILE, 'r', encoding='utf-8') as f:
+        html = f.read()
+
+    # A requested scroll count (for example scrolls=5) must not be cut to 2;
+    # the 2-scroll limit only applies to messages with no count or time set.
+    assert '(messageScrollTimes == 0 && messageDisplaySeconds == 0 && currentScrollCount >= 2)' in ino
+    assert '|| (currentScrollCount >= 2);' not in ino
+
+    # Wi-Fi names are shown as text in the setup modal, never as markup
+    assert 'function escapeHtml(' in html
+    assert 'escapeHtml(ssidVal)' in html
+    assert '"<p>Checking connection to <b>" + ssidVal' not in html
+
+
+def test_compress_script_check_mode_passes():
+    import subprocess, sys
+    script = os.path.join(BASE_DIR, "scripts", "compress_html.py")
+    result = subprocess.run([sys.executable, script, "--check"], capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
