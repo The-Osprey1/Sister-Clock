@@ -12,8 +12,7 @@ jobs:
         with:
           node-version: '22'
       - run: python -m pip install platformio==6.1.18 pytest
-      - run: python scripts/compress_html.py
-      - run: git diff --exit-code firmware/index_html.h
+      - run: python scripts/compress_html.py --check
       - run: python -m pytest -q
       - run: node tests/test_customizer.js
       - run: pio run
